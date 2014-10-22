@@ -43,6 +43,9 @@ int get_num_gpus(void);
 // set the number of GPUs
 void set_gpu_num(int);
 
+// Check how much memory is available currently
+void check_available_memory(void);
+
 // initialize the timer before we can use time_elapsed() 
 void init_timer(void);
 
@@ -55,32 +58,34 @@ double time_elapsed(void);
 
 // Timing info printer
 #ifdef OLIVE_TIMING
-    #define print_time(...) do {        \
+    #define olive_tim(...) do {         \
         fprintf(stdout, "Tim: ");       \
         fprintf(stdout, __VA_ARGS__);   \
         fprintf(stdout, "\n");          \
         fflush(stdout); } while (0);    
 #else
-    #define print_time(...)  // disregarded
+    #define olive_tim(...)  // disregarded
 #endif
 
 // Logging info printer
 #ifdef OLIVE_LOGGING
-    #define print_log(...) do {         \
+    #define olive_log(...) do {         \
         fprintf(stdout, "Log: ");       \
         fprintf(stdout, __VA_ARGS__);   \
         fprintf(stdout, "\n");          \
         fflush(stdout); } while (0);
 #else
-    #define print_log(...) // disregarded
+    #define olive_log(...) // disregarded
 #endif
 
-// Fatal error (can not be disregarded) 
-#define print_error(...) do {           \
-        fprintf(stderr, "Error: ");     \
-        fprintf(stderr, __VA_ARGS__);   \
-        fprintf(stderr, "\n");          \
-        fflush(stdout); } while (0);
+// Fatal error (can not be disregarded)
+// Print the message and quit program immediately
+#define olive_fatal(...) do {            \
+        fprintf(stderr, "Error: ");      \
+        fprintf(stderr, __VA_ARGS__);    \
+        fprintf(stderr, "\n");           \
+        fflush(stdout);                  \ 
+        assert(false); } while (0);
 
 
 #endif // OLIVE_UTIL_H

@@ -20,8 +20,13 @@ void set_gpu_num(int num) {
     SAFE_CALL(cudaSetDevice(num));
 }
 
-double last_t;
+void check_available_memory(void) {
+    size_t available = 0; size_t total = 0;             
+    CUT_SAFE_CALL(cudaMemGetInfo(&available, &total));
+    print_log("available memory: %llu / %llu", available, total);
+}
 
+double last_t;
 double get_time(void) {
     cudaThreadSynchronize();
     timeval t;
