@@ -50,7 +50,7 @@ error_t totem_calloc(void ** ptr, size_t size, olive_mem_t type);
  * Free a buffer allocated by olive_malloc() or olive_calloc() 
  * We rely on the user to pass in the correct 'type'
  * @param[in] ptr: pointer to the buffer to be freed
- * @param[in] type:type of the memory to allocate
+ * @param[in] type: type of the memory to allocate
  */
 void olive_free(void * ptr, olive_mem_t type);
 
