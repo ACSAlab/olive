@@ -1,14 +1,15 @@
+/**
+ * Utils
+ *
+ * Author: Yichao Cheng (onesuperclark@gmail.com)
+ * Created on: 2014-10-20
+ * Last Modified: 2014-10-22
+ */
 
-
+#include "olive_def.h"
 #include "olive_util.h"
 
 
-#include <cuda.h>
-#include <sys/time.h>
-
-//=============================================
-// # of GPUs
-//=============================================
 int get_num_gpus(void) {
     int num = 1;
     SAFE_CALL(cudaGetDeviceCount(&num));
@@ -19,10 +20,6 @@ void set_gpu_num(int num) {
     SAFE_CALL(cudaSetDevice(num));
 }
 
-
-//=============================================
-// Timer
-//=============================================
 double last_t;
 
 double get_time(void) {
