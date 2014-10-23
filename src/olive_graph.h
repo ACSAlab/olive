@@ -43,6 +43,7 @@ typedef float weight_t;
  * expense of bringing indirect memory access.
  */
 class GPUGraph {
+private:
     /**
      * vertex_list[i] stores the starting index of vertex i's adjacent list. 
      * We can be aware of the size of its adjacent list by simply calculating
@@ -50,18 +51,29 @@ class GPUGraph {
      * NOTE: The value in vertex_list is typed eid_t since it represents the 
      * offset in edge_list. 
      */
-    eid_t       * vertex_list;  
+    eid_t   * vertex_list;  
     /**
      * From edge_list[vertex_list[i]] stores its neibours' ids continuously. 
      * NOTE: The value in edge_list is typed eid_t since it represents the 
      * unique vertex id. 
      */
-    vid_t       * edge_list;
-    weight_t    * weight_list;   // Stores the weights of edges
-    vid_t       vertices;        // Number of vertices
-    eid_t       edges;           // Number of edges
-    bool        weighted;        // Whether we keep weights in edges
-    bool        directed;        // Whether the graph is directed
+    vid_t    * edge_list;
+    weight_t * weight_list;      // Stores the weights of edges
+    vid_t    vertices;           // Number of vertices
+    eid_t    edges;              // Number of edges
+    bool     weighted;           // Whether we keep weights in edges
+    bool     directed;           // Whether the graph is directed
+    FILE     *graph_file_handle
+
+
+    error_t GPUGraph::parse_metadata(void);
+
+    error_t GPUGraph::parse_vertex_list(void);
+
+    error_t GPUGraph::parse_edge_list(void);
+
+
+public:
     /**
      * Reads the graph from a given file and builds it in the memory
      *
@@ -78,13 +90,13 @@ class GPUGraph {
      *     information, but we can choose to build an unweighted graph
      * @return SUCCESS if built, FAILURE otherwise 
      */
-    error_t graph_initialize(const char * graph_file, bool weighted);
+    error_t initialize(const char * graph_file, bool weighted);
 
     /**
      * Free all the allocated buffers.
      * @return SUCCESS if deleted, FAILURE otherwise 
      */
-    error_t graph_finalize(void);
+    error_t finalize(void);
 };
 
 

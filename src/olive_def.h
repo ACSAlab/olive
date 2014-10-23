@@ -14,8 +14,10 @@
 #include <assert.h>
 #include <cuda.h>
 #include <sys/time.h>
-#include <stdint.h>     // e.g. int32_t
-
+#include <stdint.h>     
+#include <string.h>
+#include <ctype.h>
+ 
 // Toggles on/off the timing/logging information
 #define OLIVE_TIMING
 #define OLIVE_LOGGING
