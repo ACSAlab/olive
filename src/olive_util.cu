@@ -26,22 +26,35 @@ void check_available_memory(void) {
     print_log("available memory: %llu / %llu", available, total);
 }
 
-double last_time;
+inline bool is_numeric(char * str) {
+  assert(str);
+  while ((* str) != '\0') {
+    if (!isdigit(* str)) {
+        return false;
+    } else { 
+        str++; 
+    }
+  }
+  return true;
+}
 
-double get_time(void) {
+double Timer::get_time(void) {
     cudaThreadSynchronize();
     timeval t;
     gettimepfday(&t, NULL);
     return (double)t.tv_sec + (double)t.tv_usec/1000000;
 } 
 
-void init_timer(void) {
-    last_time = get_time();
+void Timer::initialize(void) {
+    this->last_time = get_time();
 }
 
-double time_elapsed(void) {
+double Timer::elapsed_time(void) {
     double new_time = get_time();
-    double elapesed = new_time - last_time;
-    last_time = new_time;
+    double elapesed = new_time - this->last_time;
+    this->last_time = new_time;
     return elapesed;
 }
+
+
+
