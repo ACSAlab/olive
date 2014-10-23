@@ -3,7 +3,7 @@
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-10-22
- * Last Modified: 2014-10-22
+ * Last Modified: 2014-10-23
  *
  */
 
@@ -18,15 +18,17 @@ error_t olive_malloc(void ** ptr, size_t size, olive_mem_t type) {
         if (* ptr == NULL) return FAILURE;
         break;
     case OLIVE_MEM_HOST_PINNED:
-        if (cudaMallocHost(ptr, size, cudaHostAllocPortable) != cudaSuccess) return FAILURE;
+        if (cudaMallocHost(ptr, size, cudaHostAllocPortable) != cudaSuccess) 
+            return FAILURE;
         break;
     case OLIVE_MEM_HOST_MAPPED:
         unsigned int flags = cudaHostAllocPortable;
-        // Maps the allocation into the CUDA address space. The device pointer to 
-        // the memory may be obtained by calling cudaHostGetDevicePointer().
+        // Maps the allocation into the CUDA address space. The device pointer 
+        // to the memory may be obtained by calling cudaHostGetDevicePointer().
         flags |= cudaHostAllocMapped;
-        // WriteCombined memory can be transferred across the PCI Express bus more quickly 
-        // on some system configurations, but cannot be read efficiently by most CPUs.
+        // WriteCombined memory can be transferred across the PCI Express bus 
+        // more quickly on some system configurations, but cannot be read 
+        // efficiently by most CPUs. 
         // So it is a good option for host->device transfers.
         flags |= cudaHostAllocWriteCombined;
         if (cudaMallocHost(ptr, size, flags) != cudaSuccess) return FAILURE;
@@ -40,7 +42,7 @@ error_t olive_malloc(void ** ptr, size_t size, olive_mem_t type) {
     return SUCCESS;
  }
 
-error_t olive_calloc(void** ptr, size_t size, totem_mem_t type) {
+error_t olive_calloc(void** ptr, size_t size, olive_mem_t type) {
     if (olive_malloc(ptr, size, type) != SUCCESS) return FAILURE;
     switch (type) {
     case TOTEM_MEM_HOST:

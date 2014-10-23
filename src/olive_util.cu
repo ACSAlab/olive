@@ -3,7 +3,7 @@
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-10-20
- * Last Modified: 2014-10-22
+ * Last Modified: 2014-10-23
  */
 
 #include "olive_def.h"
@@ -26,7 +26,8 @@ void check_available_memory(void) {
     print_log("available memory: %llu / %llu", available, total);
 }
 
-double last_t;
+double last_time;
+
 double get_time(void) {
     cudaThreadSynchronize();
     timeval t;
@@ -35,12 +36,12 @@ double get_time(void) {
 } 
 
 void init_timer(void) {
-    last_t = get_time();
+    last_time = get_time();
 }
 
 double time_elapsed(void) {
-    double new_t = get_time();
-    double t = new_t - last_t;
-    last_t = new_t;
-    return t;
+    double new_time = get_time();
+    double elapesed = new_time - last_time;
+    last_time = new_time;
+    return elapesed;
 }
