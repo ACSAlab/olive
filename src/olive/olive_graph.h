@@ -15,15 +15,15 @@
 
 
 /**
- * vid_t defines the number space for vertex_id.
- * Each vertex_id represents each unique vertex in the graph.
+ * vid_t defines the number space for vertex id.
+ * Each vertex id represents each unique vertex in the graph.
  * vid_t can be used to type the vertex id as well as the vertex number.
  */
 typedef uint32_t vid_t;
 
 /**
- * eid_t defines the number space for 'edge_id'.
- * However, we do not have a unique number to store an edge.
+ * eid_t defines the number space for 'edge id'.
+ * However, we do not have a unique number to represent 'edge id'.
  * An edge is represented by the relationship between two vertices.
  * So eid_t is used to type the edge number.
  */
@@ -31,18 +31,27 @@ typedef uint32_t eid_t;
 
 /**
  * In a weighted graph, each edge stores a value to represents its 'weight'.
- * weight_t defines its type.
+ * And weight_t defines its type.
  * TODO: can be abstacted by using template, because for different
  * algorithm, different precision is required
  */
 typedef float weight_t;
 
 /**
+ * For each vertex, we stores a single value in it. We might use it in some 
+ * algorithms. And value_t defines this value's type.
+ * TODO: We should support multiple values stored in each vertex as well as 
+ * a series of device function operating on them.
+ */
+typedef float value_t;
+
+
+/**
  * We store the graph in the memory in CSR (Compressed Sparsed Row) format for
  * its efficiency. CSR storage can minimize the memory footprint but at the 
  * expense of bringing indirect memory access.
  */
-class GPUGraph {
+class Graph {
 private:
     /**
      * vertex_list[i] stores the starting index of vertex i's adjacent list. 
@@ -59,34 +68,26 @@ private:
      */
     vid_t    * edge_list;
     weight_t * weight_list;      // Stores the weights of edges
+    value_t  * value_list;       // Stores the values of vertices
     vid_t    vertices;           // Number of vertices
     eid_t    edges;              // Number of edges
-    bool     weighted;           // Whether we keep weights in edges
+    bool     weighted;           // Whether we keep weight in edges
     bool     directed;           // Whether the graph is directed
-    FILE     *graph_file_handle
-
-
-    error_t GPUGraph::parse_metadata(void);
-
-    error_t GPUGraph::parse_vertex_list(void);
-
-    error_t GPUGraph::parse_edge_list(void);
-
-
+    bool     valued;             // Whether we keep value in vertices
 public:
     /**
-     * Reads the graph from a given file and builds it in the memory
+     * Reads the graph from a given file and builds it in the host memory.
      *
      * IMPORTANT: The graph file must be fed in following format
      *     # Nodes: <num_of_nodes>
      *     # Edges: <num_of_edges>
-     *     # Directed/Indirected
-     *     # Weighted/Unwieghted
-     *     [src] [dest] <weight>
-     *     ...
+     *     # Directed|Indirected
+     *     # Weighted|Unwieghted
+     *     node list
+     *     edge list
      *
      * @param[in] graph_file: the path to the graph we want to read
-     * @param[in] weighted: the read-in graph may contain the weight
+     * @param[in] weighted: the readin graph may contain the weight
      *     information, but we can choose to build an unweighted graph
      * @return SUCCESS if built, FAILURE otherwise 
      */
@@ -94,9 +95,8 @@ public:
 
     /**
      * Free all the allocated buffers.
-     * @return SUCCESS if deleted, FAILURE otherwise 
      */
-    error_t finalize(void);
+    void finalize(void);
 };
 
 
