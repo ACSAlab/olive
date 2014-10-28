@@ -25,13 +25,13 @@ error_t Graph::initialize(const char * graph_file, bool weighted) {
      * Tokens are separated by ' \t\n'
      */
     char line[1024];                // Stores the readin line
-    char token[];                   // Stores the token 
+    char token[];                   // Stores the token
     const char delims[] = " \t\n";  // Delimiters to separate tokens
     /**
      * Parse metadata of the graph file (four lines). It is critical to build 
      * the graph in memory. The first line should be formatted as '# Nodes: 145'
      */
-    TRY(fgets(line, 1024, graph_file_handler), err_metadata); 
+    TRY(fgets(line, 1024, graph_file_handler), err_metadata);
     token = strsep(&line, delims);
     TRY(strcmp(token, "#") == 0, err_metadata);
     token = strsep(&line, delims);
@@ -39,8 +39,8 @@ error_t Graph::initialize(const char * graph_file, bool weighted) {
     token = strsep(&line, delims);
     TRY(is_numeric(token), err_metadata);
     * vertices = atoi(token);
-    
-    //Second line should look like '# Edges: 145'
+
+    // Second line should look like '# Edges: 145'
     TRY(fgets(line, 1024, graph_file_handler), err_metadata);
     token = strsep(&line, delims);
     TRY(strcmp(token, "#") == 0, err_metadata);
@@ -49,7 +49,7 @@ error_t Graph::initialize(const char * graph_file, bool weighted) {
     token = strsep(&line, delims);
     TRY(is_numeric(token), err_metadata);
     * edges = atoi(token);
-    
+
     // Third line should look like '# Directed' or '# Indirected'
     TRY(fgets(line, 1024, graph_file_handler), err_metadata);
     token = strsep(&line, delims);
@@ -62,7 +62,7 @@ error_t Graph::initialize(const char * graph_file, bool weighted) {
     } else {
         goto err_metadata;
     }
-    
+
     // Fourth line should look like '# Weighted' or '# Unweighted'
     TRY(fgets(line, 1024, graph_file_handler), err_metadata);
     token = strsep(&line, delims);
@@ -82,17 +82,17 @@ error_t Graph::initialize(const char * graph_file, bool weighted) {
      * And it is possible to have 0 edges in a single-node graph.
      */
     if (vertices > 0)
-        TRY(olive_malloc(vertex_list, (vertices + 1) * sizeof(eid_t), OLIVE_MEM_HOST),
-            err_host_alloc);
+        TRY(olive_malloc(vertex_list, (vertices + 1) * sizeof(eid_t),
+                         OLIVE_MEM_HOST), err_host_alloc);
     if (edges > 0)
-        TRY(olive_malloc(edge_list, edges * sizeof(vid_t), OLIVE_MEM_HOST),
-            err_host_alloc);
+        TRY(olive_malloc(edge_list, edges * sizeof(vid_t),
+                         OLIVE_MEM_HOST), err_host_alloc);
     if (weighted)
-        TRY(olive_malloc(weight_list, edges * sizeof(weight_t), OLIVE_MEM_HOST), 
-            err_host_alloc);
+        TRY(olive_malloc(weight_list, edges * sizeof(weight_t),
+                         OLIVE_MEM_HOST), err_host_alloc);
     if (valued)
-        TRY(olive_malloc(value_list, vertices * sizeof(value_t), OLIVE_MEM_HOST), 
-            err_host_alloc);
+        TRY(olive_malloc(value_list, vertices * sizeof(value_t),
+                         OLIVE_MEM_HOST), err_host_alloc);
     /**
      * Parse the graph data and sets up the vertex/edge/value/weight list
      * NOTE: the graph data is stored in CSR format
@@ -100,12 +100,12 @@ error_t Graph::initialize(const char * graph_file, bool weighted) {
 
 
     // Close the file and return safely
-    fclose(graph_file_handler);   
+    fclose(graph_file_handler);
     return SUCCESS;
     // Exception handlers
 err_file:
     olive_error("cannot open graph file: %s", graph_file);
-    return FAILURE;        
+    return FAILURE;
 err_metadata:
     fclose(graph_file_handler);
     olive_error("metadata can not be parsed: %s\n%s", token, remain);

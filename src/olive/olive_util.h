@@ -14,7 +14,7 @@
 int get_num_gpus(void);
 
 // set the number of GPUs
-void set_gpu_num(int);
+void set_gpu_num(int num);
 
 // Check how much memory is available currently
 void check_available_memory(void);
@@ -27,22 +27,21 @@ void check_available_memory(void);
 inline bool is_numeric(char * str);
 
 // A simple timer
-// TODO: add more functions to make it more powerful
+// TODO(onesuper): add more functions to make it more powerful
 class Timer {
-private:
+ private:
     double last_time;
-public:
-    // initialize the timer before we can use time_elapsed() 
+ public:
+    // initialize the timer before we can use time_elapsed()
     void initialize(void);
 
-    // @return the current time 
+    // @return the current time
     double get_time(void);
 
     // @return the elapsed time between two continous call to this function
-    double elapsed_time(void);    
+    double elapsed_time(void);
 };
 
 
-#endif // OLIVE_UTIL_H
-
+#endif  // OLIVE_UTIL_H
 

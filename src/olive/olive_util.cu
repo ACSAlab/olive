@@ -14,14 +14,14 @@ int get_num_gpus(void) {
     int num = 1;
     SAFE_CALL(cudaGetDeviceCount(&num));
     return num;
-} 
+}
 
 void set_gpu_num(int num) {
     SAFE_CALL(cudaSetDevice(num));
 }
 
 void check_available_memory(void) {
-    size_t available = 0; size_t total = 0;             
+    size_t available = 0; size_t total = 0;
     CUT_SAFE_CALL(cudaMemGetInfo(&available, &total));
     print_log("available memory: %llu / %llu", available, total);
 }
@@ -31,9 +31,8 @@ inline bool is_numeric(char * str) {
   while ((* str) != '\0') {
     if (!isdigit(* str)) {
         return false;
-    } else { 
-        str++; 
-    }
+    } else {
+        str++;    }
   }
   return true;
 }
@@ -42,8 +41,8 @@ double Timer::get_time(void) {
     cudaThreadSynchronize();
     timeval t;
     gettimepfday(&t, NULL);
-    return (double)t.tv_sec + (double)t.tv_usec/1000000;
-} 
+    return static<double> t.tv_sec + static<double> t.tv_usec/1000000;
+}
 
 void Timer::initialize(void) {
     this->last_time = get_time();

@@ -7,11 +7,11 @@
  */
 
 
- #ifndef OLIVE_GRAPH_H
- #define OLIVE_GRAPH_H
+#ifndef OLIVE_GRAPH_H
+#define OLIVE_GRAPH_H
 
 
- #include "olive_def.h"
+#include "olive_def.h"
 
 
 /**
@@ -52,7 +52,7 @@ typedef float value_t;
  * expense of bringing indirect memory access.
  */
 class Graph {
-private:
+ private:
     /**
      * vertex_list[i] stores the starting index of vertex i's adjacent list. 
      * We can be aware of the size of its adjacent list by simply calculating
@@ -60,7 +60,7 @@ private:
      * NOTE: The value in vertex_list is typed eid_t since it represents the 
      * offset in edge_list. 
      */
-    eid_t   * vertex_list;  
+    eid_t   * vertex_list;
     /**
      * From edge_list[vertex_list[i]] stores its neibours' ids continuously. 
      * NOTE: The value in edge_list is typed eid_t since it represents the 
@@ -74,7 +74,8 @@ private:
     bool     weighted;           // Whether we keep weight in edges
     bool     directed;           // Whether the graph is directed
     bool     valued;             // Whether we keep value in vertices
-public:
+
+ public:
     /**
      * Reads the graph from a given file and builds it in the host memory.
      *
@@ -102,4 +103,4 @@ public:
 
 
 
-#endif // OLIVE_GRAPH
+#endif  // OLIVE_GRAPH

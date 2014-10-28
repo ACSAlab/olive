@@ -14,10 +14,10 @@
 #include <assert.h>
 #include <cuda.h>
 #include <sys/time.h>
-#include <stdint.h>     
+#include <stdint.h>
 #include <string.h>
 #include <ctype.h>
- 
+
 // Toggles on/off the timing/logging information
 #define OLIVE_TIMING
 #define OLIVE_LOGGING
@@ -55,7 +55,7 @@ typedef enum {
             fprintf(stderr, "CudaError<%s : %i> : %s.\n"),          \
                     __FILE__, __LINE__, cudaGetErrorString(err) );  \
             assert(0);                                              \
-        }                                                           \ 
+        }                                                           \
     } while (0);
 
 /**
@@ -74,7 +74,7 @@ typedef enum {
             fprintf(stdout, __VA_ARGS__);       \
             fprintf(stdout, "\n");              \
             fflush(stdout);                     \
-        } while (0);                        
+        } while (0);
 #else
     #define olive_tim(...)  // disregarded
 #endif
@@ -91,7 +91,7 @@ typedef enum {
             fflush(stdout);                     \
         } while (0);
 #else
-    #define olive_log(...) // disregarded
+    #define olive_log(...)  // disregarded
 #endif
 
 /**
@@ -103,7 +103,7 @@ typedef enum {
         fprintf(stderr, "Fatal: ");             \
         fprintf(stderr, __VA_ARGS__);           \
         fprintf(stderr, "\n");                  \
-        fflush(stdout);                         \ 
+        fflush(stdout);                         \
         assert(false);                          \
     } while (0);
 
