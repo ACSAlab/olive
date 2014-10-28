@@ -35,7 +35,7 @@ class Timer {
     // initialize the timer before we can use time_elapsed()
     void initialize(void);
 
-    // @return the current time
+    // @return the current time in seconds
     double get_time(void);
 
     // @return the elapsed time between two continous call to this function

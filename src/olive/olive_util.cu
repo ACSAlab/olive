@@ -32,7 +32,8 @@ inline bool is_numeric(char * str) {
     if (!isdigit(* str)) {
         return false;
     } else {
-        str++;    }
+        str++;
+    }
   }
   return true;
 }
@@ -41,7 +42,8 @@ double Timer::get_time(void) {
     cudaThreadSynchronize();
     timeval t;
     gettimepfday(&t, NULL);
-    return static<double> t.tv_sec + static<double> t.tv_usec/1000000;
+    return static_cast<double> t.tv_sec +
+        static_cast<double> (t.tv_usec / 1000000);
 }
 
 void Timer::initialize(void) {

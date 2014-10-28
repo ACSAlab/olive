@@ -2,7 +2,7 @@
  * Defines the interface for the graph data structure
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-10-23
- * Last Modified: 2014-10-23
+ * Last Modified: 2014-10-28
  *
  */
 
@@ -20,7 +20,8 @@
 typedef uint32_t vid_t;
 
 /**
- * eid_t defines the number space for edge id.
+ * eid_t defines the number space for edge id. In a sparse graph, the edge
+ * number is awlays much greater than the vertex number.
  */
 typedef uint32_t eid_t;
 
@@ -40,7 +41,6 @@ typedef float weight_t;
  */
 typedef float value_t;
 
-
 /**
  * We store the graph in the memory in CSR (Compressed Sparsed Row) format for
  * its efficiency. CSR storage can minimize the memory footprint but at the 
@@ -53,7 +53,7 @@ class Graph {
      * edge_list array. We can be aware of the size of its adjacent list by
      * simply calculating vertex_list[i+1] - vertex_list[i].
      */
-    eid_t   * vertex_list;
+    eid_t    * vertex_list;
     /**
      * edge_list array stores the dest vertex id of all outgoing edges.
      * e.g. From edge_list[vertex_list[i]] stores i's neibours' ids. 
@@ -81,10 +81,9 @@ class Graph {
      * IMPORTANT: The graph file must be fed in following format
      *     # Nodes: <num_of_nodes>
      *     # Edges: <num_of_edges>
-     *     # Directed|Indirected
-     *     # Weighted|Unwieghted
-     *     vertex list
-     *     edge list
+     *     # Weighted | Unweighed
+     *     vertex list (could contain a single value)
+     *     edge list (could contain a single weight)
      *
      * @param[in] graph_file: the path to the graph we want to read
      * @param[in] weighted: the readin graph may contain the weight
