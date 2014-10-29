@@ -17,6 +17,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 // Toggles on/off the timing/logging information
 #define OLIVE_TIMING
@@ -46,13 +48,13 @@ typedef enum {
     do {                                                            \
         cudaError_t err = cudaGetLastError();                       \
         if (cudaSuccess != err) {                                   \
-            fprintf(stderr, "CudaError<%s : %i> : %s.\n"),          \
+            fprintf(stderr, "CudaError<%s : %i> : %s.\n",           \
                     __FILE__, __LINE__, cudaGetErrorString(err) );  \
             assert(0);                                              \
         }                                                           \
         err = cudaThreadSynchronize();                              \
         if (cudaSuccess != err) {                                   \
-            fprintf(stderr, "CudaError<%s : %i> : %s.\n"),          \
+            fprintf(stderr, "CudaError<%s : %i> : %s.\n",          \
                     __FILE__, __LINE__, cudaGetErrorString(err) );  \
             assert(0);                                              \
         }                                                           \
@@ -62,7 +64,11 @@ typedef enum {
  * CUT_CALL_SAFE is used to wrap around the cuda runtime call to 
  * check if it causes any error.
  */
-#define CUT_CALL_SAFE(func) { func; CUT_CHECK_ERROR(); }
+#define CUT_CALL_SAFE(func_call)     \
+    do {                             \
+        func_call;                   \
+        CUT_CHECK_ERROR();           \
+    } while (0);                     \
 
 /**
  * Timing info printer. Can be toggle off if wanted

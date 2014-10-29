@@ -101,11 +101,11 @@ DEPS = $(wildcard $(OLIVE_DIR)/*.h)
 # Target/common rule for building olive codes
 # Use make objects to build the objects only
 #-------------------------------------------------------------------------------
-objects: $(CUOBJS)
+objects: $(OBJ_DIR) $(CUOBJS)
 
 $(OBJ_DIR)/%.cu.o: $(OLIVE_DIR)/%.cu $(DEPS)
 	@echo "Creating cuda object: "$@
-	$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) -c
+	@$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) -c
 
 
 #-------------------------------------------------------------------------------
@@ -120,21 +120,21 @@ $(OBJ_DIR)/%.cu.o: $(OLIVE_DIR)/%.cu $(DEPS)
 bfs: $(BIN_DIR) $(BIN_DIR)/test_bfs
 
 $(BIN_DIR)/test_bfs: test_bfs.cu objects $(DEPS)
-	@printf "building bfs...\n"
-	$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC)
+	@printf "Building bfs...\n"
+	@$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC)
 
 
 #-------------------------------------------------------------------------------
 # Rules for build directories
 #-------------------------------------------------------------------------------
 $(BIN_DIR): $(BUILD_DIR)
-	mkdir -p $(BIN_DIR)
+	@mkdir -p $(BIN_DIR)
 
 $(OBJ_DIR): $(BUILD_DIR)
-	mkdir -p $(OBJ_DIR)
+	@mkdir -p $(OBJ_DIR)
 
 $(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
+	@mkdir -p $(BUILD_DIR)
 
 #-------------------------------------------------------------------------------
 # Clean

@@ -10,19 +10,19 @@
 #ifndef OLIVE_MEM_H
 #define OLIVE_MEM_H
 
-#include "olive_def.h"
 
 /**
  * Memory operation type. We pass the type as parameter to 
  * differetiate the behavior (allocate or free).
  */
 typedef enum {
-    OLIVE_MEM_HOST = 0,     // Allocated in the address space of CPU-side memory 
-    OLIVE_MEM_HOST_PINNED,  // CPU-side pinned memory 
-    OLIVE_MEM_HOST_MAPPED,  // CPU-side pinned memory, but also mapped to the 
-                            // address space of the GPU memory. To refer the GPU-side
-                            // space, cudaHostGetDevicePointer() must be called.
-    OLIVE_MEM_DEVICE        // Allocated in the address space of the GPU's memory
+    OLIVE_MEM_HOST = 0,     // Allocated in the address space of CPU-side memory
+    OLIVE_MEM_DEVICE,       // Allocated in the address space of the GPU memory
+    OLIVE_MEM_HOST_PINNED,  // CPU-side pinned memory
+    OLIVE_MEM_HOST_MAPPED   // CPU-side pinned memory, but also mapped to the
+                            // address space of the GPU memory. To refer the
+                            // GPU-side space, cudaHostGetDevicePointer() must
+                            // be called.
 } olive_mem_t;
 
 
@@ -53,8 +53,9 @@ error_t totem_calloc(void ** ptr, size_t size, olive_mem_t type);
  * We rely on the user to pass in the correct 'type'
  * @param[in] ptr: pointer to the buffer to be freed
  * @param[in] type: type of the memory to allocate
+ * @return SUCCESS if the buffer has been allocated, FAILURE otherwise
  */
-void olive_free(void * ptr, olive_mem_t type);
+error_t olive_free(void * ptr, olive_mem_t type);
 
 
 #endif // OLIVE_MEM_H

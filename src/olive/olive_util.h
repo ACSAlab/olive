@@ -10,6 +10,7 @@
 #ifndef OLIVE_UTIL_H
 #define OLIVE_UTIL_H
 
+#include "olive_def.h"
 
 // @return the number of the GPUs
 int get_num_gpus(void);
@@ -25,7 +26,7 @@ void check_available_memory(void);
  * @param[in] str: the string to check
  * @return true if the string represents a numeric number
  */
-inline bool is_numeric(char * str);
+bool is_numeric(char * str);
 
 // A simple timer
 // TODO(onesuper): add more functions to make it more powerful

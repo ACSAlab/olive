@@ -22,16 +22,20 @@ error_t olive_malloc(void ** ptr, size_t size, olive_mem_t type) {
             return FAILURE;
         break;
     case OLIVE_MEM_HOST_MAPPED:
-        unsigned int flags = cudaHostAllocPortable;
-        // Maps the allocation into the CUDA address space. The device pointer
-        // to the memory may be obtained by calling cudaHostGetDevicePointer().
-        flags |= cudaHostAllocMapped;
-        // WriteCombined memory can be transferred across the PCI Express bus
-        // more quickly on some system configurations, but cannot be read
-        // efficiently by most CPUs.
-        // So it is a good option for host->device transfers.
-        flags |= cudaHostAllocWriteCombined;
-        if (cudaMallocHost(ptr, size, flags) != cudaSuccess) return FAILURE;
+        /**
+         * cudaHostAllocMapped maps the allocation into the CUDA address space.
+         * The device pointer to the memory may be obtained by calling
+         * cudaHostGetDevicePointer().
+         *
+         * cudaHostAllocWriteCombined memory can be transferred across the PCI
+         * Express bus more quickly on some system configurations, but cannot
+         * be read efficiently by most CPUs. So it is a good option for 
+         * host->device transfers.
+         */
+        if (cudaMallocHost(ptr, size, cudaHostAllocPortable |
+                                      cudaHostAllocMapped |
+                                      cudaHostAllocWriteCombined)
+            != cudaSuccess) return FAILURE;
         break;
     case OLIVE_MEM_DEVICE:
         if (cudaMalloc(ptr, size) != cudaSuccess) return FAILURE;
@@ -45,12 +49,12 @@ error_t olive_malloc(void ** ptr, size_t size, olive_mem_t type) {
 error_t olive_calloc(void** ptr, size_t size, olive_mem_t type) {
     if (olive_malloc(ptr, size, type) != SUCCESS) return FAILURE;
     switch (type) {
-    case TOTEM_MEM_HOST:
-    case TOTEM_MEM_HOST_PINNED:
-    case TOTEM_MEM_HOST_MAPPED:
+    case OLIVE_MEM_HOST:
+    case OLIVE_MEM_HOST_PINNED:
+    case OLIVE_MEM_HOST_MAPPED:
         memset(* ptr, 0, size);
         break;
-    case TOTEM_MEM_DEVICE:
+    case OLIVE_MEM_DEVICE:
         if (cudaMemset(* ptr, 0, size) != cudaSuccess) return FAILURE;
         break;
     default:
@@ -59,20 +63,21 @@ error_t olive_calloc(void** ptr, size_t size, olive_mem_t type) {
     return SUCCESS;
 }
 
-void olive_free(void * ptr, olive_mem_t type) {
+error_t olive_free(void * ptr, olive_mem_t type) {
     switch (type) {
     case OLIVE_MEM_HOST:
         free(ptr);
         break;
     case OLIVE_MEM_HOST_PINNED:
     case OLIVE_MEM_HOST_MAPPED:
-        CUT_SAFE_CALL(cudaFreeHost(ptr));
+        if (cudaFreeHost(ptr)) return FAILURE;
         break;
     case OLIVE_MEM_DEVICE:
-        CUT_SAFE_CALL(cudaFree(ptr));
+        if (cudaFree(ptr)) return FAILURE;
         break;
     default:
         olive_fatal("invalid memory type");
     }
+    return SUCCESS;
 }
 
