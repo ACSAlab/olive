@@ -2,3 +2,5 @@
 *.sublime-workspace
 
 *.sublime-project
+
+sftp-config.json

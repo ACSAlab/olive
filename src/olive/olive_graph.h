@@ -1,9 +1,9 @@
 /**
  * Defines the interface for the graph data structure
+ *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-10-23
  * Last Modified: 2014-10-28
- *
  */
 
 
@@ -86,16 +86,19 @@ class Graph {
      *     edge list (could contain a single weight)
      *
      * @param[in] graph_file: the path to the graph we want to read
-     * @param[in] weighted: the readin graph may contain the weight
-     *     information, but we can choose to build an unweighted graph
      * @return SUCCESS if built, FAILURE otherwise 
      */
-    error_t initialize(const char * graph_file, bool weighted);
+    error_t initialize(const char * graph_file);
 
     /**
      * Free all the allocated buffers.
      */
     void finalize(void);
+
+    /**
+     * Print the graph data onto the screen
+     */
+    void print(void);
 };
 
 

@@ -1,5 +1,5 @@
 #===============================================================================
-# Project Makefile 
+# Test Makefile 
 #
 #
 # Author: Yichao Cheng (onesuperclark@gmail.com)
@@ -8,21 +8,42 @@
 #
 #===============================================================================
 
+#-------------------------------------------------------------------------------
+# Compiler switches
+#-------------------------------------------------------------------------------
+force_cuda5 = 1
+force64 = 1
+force_sm35 = 0
+disable_l1_cache = 0
+
 
 #-------------------------------------------------------------------------------
 # Directories
 #-------------------------------------------------------------------------------
 PROJECT_ROOT = ../..
+OLIVE_DIR = $(PROJECT_ROOT)/src/olive
+BUILD_DIR = $(PROJECT_ROOT)/build
+OBJ_DIR = $(BUILD_DIR)/obj
+BIN_DIR = $(BUILD_DIR)/bin
 
 
 #-------------------------------------------------------------------------------
 # Compliers and flags
 #-------------------------------------------------------------------------------
-NVCC = "$(shell which nvcc)"
+CC = gcc
 CXX = g++
-NVCCFLAGS = -O3 -g
-CFLAGS = -Wall -O3 -g
-LDFLAGS = 
+NVCCFLAGS = -O3
+CCFLAGS = -Wall -O3
+
+
+#-------------------------------------------------------------------------------
+# NVCC version
+#-------------------------------------------------------------------------------
+ifneq ($(force_cuda5), 1)
+	NVCC = "$(shell which nvcc)"
+else
+	NVCC = /usr/local/cuda-5.5/bin/nvcc
+endif
 
 
 #-------------------------------------------------------------------------------
@@ -31,7 +52,7 @@ LDFLAGS =
 GEN_SM20 = -gencode=arch=compute_20,code=\"sm_20,compute_20\"
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\"
 
-ifneq ($(force_sm_35), 1)
+ifneq ($(force_sm35), 1)
 	NVCCFLAGS += $(GEN_SM20)
 else
 	NVCCFLAGS += $(GEN_SM35)
@@ -48,48 +69,82 @@ else
 	NVCCFLAGS += -Xptxas -dlcm=cg
 endif
 
-
-#-------------------------------------------------------------------------------
-# Dependency lists
-#-------------------------------------------------------------------------------
-DEPS = $(wildcard $(PROJECT_ROOT)/olive/*.h)
-
-
 #-------------------------------------------------------------------------------
 # 64 or 32 bit
 #-------------------------------------------------------------------------------
 ifneq ($(force64), 1)
 	# Compile with 32-bit device pointers by default
-	ARCH_SUFFIX = i386
-	ARCH = -m32
+	NVCCFLAGS += -m32
+	CCFLAGS += -m32
 else
-	ARCH_SUFFIX = x86_64
-	ARCH = -m64
+	NVCCFLAGS += -m64
+	CCFLAGS += -m64
 endif
 
 
 #-------------------------------------------------------------------------------
-# BFS
+# Includes (src and include bothin in OLIVE_DIR)
 #-------------------------------------------------------------------------------
-bfs: bin/$(ARCH_SUFFIX)/test_bfs
+INC = -I$(OLIVE_DIR)
 
-bin/$(ARCH_SUFFIX)/bfs: test_bfs.cu $(DEPS)
-	@mkdir -p bin
-	@mkdir -p bin/$(ARCH_SUFFIX)
-	$(NVCCFLAGS) $< -o $@
 
+
+#-------------------------------------------------------------------------------
+# Generates the name lists for building
+#-------------------------------------------------------------------------------
+CUSRC   = $(wildcard $(OLIVE_DIR)/*.cu)  
+CUOBJS  = $(patsubst $(OLIVE_DIR)/%.cu, $(OBJ_DIR)/%.cu.o, $(CUSRC)) 
+DEPS = $(wildcard $(OLIVE_DIR)/*.h)
+
+
+#-------------------------------------------------------------------------------
+# Target/common rule for building olive codes
+# Use make objects to build the objects only
+#-------------------------------------------------------------------------------
+objects: $(CUOBJS)
+
+$(OBJ_DIR)/%.cu.o: $(OLIVE_DIR)/%.cu $(DEPS)
+	@echo "Creating cuda object: "$@
+	$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) -c
+
+
+#-------------------------------------------------------------------------------
+# Targets
+#-------------------------------------------------------------------------------
+.PHONY: clean clean-bin clean-all bfs
+
+
+#-------------------------------------------------------------------------------
+# Rules for BFS
+#-------------------------------------------------------------------------------
+bfs: $(BIN_DIR) $(BIN_DIR)/test_bfs
+
+$(BIN_DIR)/test_bfs: test_bfs.cu objects $(DEPS)
+	@printf "building bfs...\n"
+	$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC)
+
+
+#-------------------------------------------------------------------------------
+# Rules for build directories
+#-------------------------------------------------------------------------------
+$(BIN_DIR): $(BUILD_DIR)
+	mkdir -p $(BIN_DIR)
+
+$(OBJ_DIR): $(BUILD_DIR)
+	mkdir -p $(OBJ_DIR)
+
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
 
 #-------------------------------------------------------------------------------
 # Clean
 #-------------------------------------------------------------------------------
 clean:
-	rm -f *.o 
+	rm -f $(OBJ_DIR)/*.o 
 
+clean-bin: 
+	rm -rf $(BIN_DIR)/*
 
-#-------------------------------------------------------------------------------
-# Clean executables
-#-------------------------------------------------------------------------------
-clean-build: 
-	rm -rf bin
-
+clean-all: 
+	rm -rf $(BUILD_DIR)/*
 

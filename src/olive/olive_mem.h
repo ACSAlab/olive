@@ -4,11 +4,13 @@
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-10-22
  * Last Modified: 2014-10-22
- *
  */
+
 
 #ifndef OLIVE_MEM_H
 #define OLIVE_MEM_H
+
+#include "olive_def.h"
 
 /**
  * Memory operation type. We pass the type as parameter to 

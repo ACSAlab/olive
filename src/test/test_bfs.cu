@@ -6,15 +6,15 @@
  * Last Modified: 2014-10-28
  */
 
-// totem includes
-#include "totem_graph.h"
+// olive includes
+#include "olive_graph.h"
 
-#define DATA_ROOT(graph_file) "../data/"graph_file
+#define GRAPH_ROOT(graph_file) "../data/"graph_file
 
 int main(int argc, char** argv) {
     Graph g;
-    g.initialize(DATA_ROOT("merrill.csr"));
+    g.initialize(GRAPH_ROOT("merrill.csr"));
     g.print();
-    g.finialize();
+    g.finalize();
     return 0;
 }

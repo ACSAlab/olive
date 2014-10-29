@@ -1,9 +1,9 @@
 /**
  * Defines the interface for the graph data structure
+ *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-10-23
  * Last Modified: 2014-10-23
- *
  */
 
 
@@ -12,11 +12,12 @@
 #include "olive_util.h"
 
 
-error_t Graph::initialize(const char * graph_file, bool weighted) {
+error_t Graph::initialize(const char * graph_file) {
     // Opens graph file
     FILE * graph_file_handler;
     graph_file_handler = fopen(graph_file, 'r');
     TRY(graph_file_handler != NULL, err_file);
+    olive_log("reading from graph file: %s", graph_file);
     /**
      * Defines Data structures for parsing token
      * Here we use strsep() to get one token from line[]
@@ -39,8 +40,10 @@ error_t Graph::initialize(const char * graph_file, bool weighted) {
     token = strsep(&line, delims);
     TRY(is_numeric(token), err_numeric);
     * vertices = static_cast<vid_t> atoi(token);
-
-    // The second line is expected to be '# Edges: 145'
+    olive_log("input graph has %d nodes", * vertices);
+    /**
+     * The second line is expected to be '# Edges: 145'
+     */
     TRY(fgets(line, sizeof(line), graph_file_handler), err_parse);
     token = strsep(&line, delims);
     TRY(strcmp(token, "#") == 0, err_parse);
@@ -49,8 +52,10 @@ error_t Graph::initialize(const char * graph_file, bool weighted) {
     token = strsep(&line, delims);
     TRY(is_numeric(token), err_numeric);
     * edges = static_cast<eid_t> atoi(token);
-
-    // The third line is expected to be '# Weighted' or '# Unweighted'
+    olive_log("input graph has %d edges", * edges);
+    /**
+     * The third line is expected to be '# Weighted' or '# Unweighted'
+     */
     TRY(fgets(line, sizeof(line), graph_file_handler), err_parse);
     token = strsep(&line, delims);
     TRY(strcmp(token, "#") == 0, err_parse);
@@ -62,33 +67,44 @@ error_t Graph::initialize(const char * graph_file, bool weighted) {
     } else {
         goto err_parse;
     }
+    olive_log("input graph is %sweighted", weighted ? "" : "un");
     /** 
      * TODO(onesuper): support vertex-wise value later
      */
     valued = false;
+    olive_log("input graph is %svalued", valued; ? "" : "in");
     /**
      * Allocate the graph in the host memory
      * The graph size is decided by the metadata  
      * NOTE: the len of vertex_list[] is N+1. 
      * And it is possible to have 0 edges in a single-node graph.
      */
-    if (vertices > 0)
+    if (vertices > 0) {
         TRY(olive_malloc(vertex_list, (vertices + 1) * sizeof(eid_t),
                          OLIVE_MEM_HOST), err_host_alloc);
-    if (edges > 0)
+        olive_log("vertex list has been allocated on host");
+    }
+    if (edges > 0) {
         TRY(olive_malloc(edge_list, edges * sizeof(vid_t),
                          OLIVE_MEM_HOST), err_host_alloc);
-    if (weighted)
+        olive_log("edge list has been allocated on host");
+    }
+    if (weighted) {
         TRY(olive_malloc(weight_list, edges * sizeof(weight_t),
                          OLIVE_MEM_HOST), err_host_alloc);
-    if (valued)
+        olive_log("weight list has been allocated on host");
+    }
+    if (valued) {
         TRY(olive_malloc(value_list, vertices * sizeof(value_t),
                          OLIVE_MEM_HOST), err_host_alloc);
+        olive_log("value list has been allocated on host");
+    }
     /**
      * Parse the graph data and sets up the vertex/edge/value/weight list
      * NOTE: the graph data is stored in CSR format. And there should be N+1
      * lines in the vertex list. The last vertex act as a sentinel
      */
+    olive_log("parsing vertex list from file...");
     vid_t vid = 0;
     while (v < vertices+1) {
         TRY(fgets(line, sizeof(line), graph_file_handler), err_parse);
@@ -96,6 +112,7 @@ error_t Graph::initialize(const char * graph_file, bool weighted) {
         TRY(is_numeric(token), err_numeric);
         vertex_list[vid] = static_cast<eid_t> atoi(token);
     }
+    olive_log("parsing edge list from file...");
     // Parsing the edge list.
     eid_t eid = 0;
     while (eid < edges) {
@@ -142,4 +159,16 @@ void Graph::finalize(void) {
     if (value_list)  olive_free(value_list, OLIVE_MEM_HOST);
 }
 
+void Graph::print(void) {
+    // Print the vertex list
+    vid_t vid = 0;
+    while (v < vertices+1) {
+        printf("%d ", vertex_list[vid]);
+    }
+    // Print the edge list
+    eid_t eid = 0;
+    while (eid < edges) {
+        printf("%d ", edge_list[eid]);
+    }
+}
 
