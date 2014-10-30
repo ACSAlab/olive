@@ -13,20 +13,20 @@
 #include "olive_def.h"
 
 // @return the number of the GPUs
-int get_num_gpus(void);
+int getNumGpus(void);
 
 // set the number of GPUs
-void set_gpu_num(int num);
+void setGpuNum(int num);
 
 // Check how much memory is available currently
-void check_available_memory(void);
+void checkAvailableMemory(void);
 
 /**
  * Checks if the string is a numeric number
  * @param[in] str: the string to check
  * @return true if the string represents a numeric number
  */
-bool is_numeric(char * str);
+bool isNumeric(char * str);
 
 // A simple timer
 // TODO(onesuper): add more functions to make it more powerful
@@ -38,11 +38,12 @@ class Timer {
     void initialize(void);
 
     // @return the current time in seconds
-    double get_time(void);
+    double getTime(void);
 
     // @return the elapsed time between two continous call to this function
-    double elapsed_time(void);
+    double elapsedTime(void);
 };
+
 
 
 #endif  // OLIVE_UTIL_H

@@ -15,23 +15,22 @@
 
 
 /**
- * vid_t defines the number space for vertex id.
+ * Defines type of the number space for vertex id.
  */
-typedef uint32_t vid_t;
+typedef uint32_t VertexId;
 
 /**
- * eid_t defines the number space for edge id. In a sparse graph, the edge
+ * Defines the number space for edge id. In a sparse graph, the edge
  * number is awlays much greater than the vertex number.
  */
-typedef uint32_t eid_t;
+typedef uint32_t EdgeId;
 
 /**
  * In a weighted graph, each edge stores a value to represents its 'weight'.
- * And weight_t defines its type.
  * TODO: can be abstacted by using template, because for different
  * algorithm, different precision is required
  */
-typedef float weight_t;
+typedef float Weight;
 
 /**
  * For each vertex, we stores a single value in it. We might use it in some 
@@ -39,7 +38,7 @@ typedef float weight_t;
  * TODO: We should support multiple values stored in each vertex as well as 
  * a series of device function operating on them.
  */
-typedef float value_t;
+typedef float Value;
 
 /**
  * We store the graph in the memory in CSR (Compressed Sparsed Row) format for
@@ -49,27 +48,27 @@ typedef float value_t;
 class Graph {
  private:
     /**
-     * vertex_list[i] stores the starting index of vertex i's adjacent list in
+     * Stores the starting index of vertex i's adjacent list in
      * edge_list array. We can be aware of the size of its adjacent list by
-     * simply calculating vertex_list[i+1] - vertex_list[i].
+     * simply calculating vertexList[i+1] - vertexList[i].
      */
-    eid_t    * vertex_list;
+    EdgeId   * vertexList;
     /**
-     * edge_list array stores the dest vertex id of all outgoing edges.
-     * e.g. From edge_list[vertex_list[i]] stores i's neibours' ids. 
+     * Stores the array of dest vertex ids for outgoing edges.
+     * e.g. From edgeList[vertexList[i]] stores i's neibours' ids. 
      */
-    vid_t    * edge_list;
+    VertexId * edgeList;
     /**
-     * NOTE: each item in vertex_list array stands for a logical vertex. And it
+     * NOTE: each item in vertexList[] array stands for a logical vertex. And it
      * stores the indices to query outgoing edges. The number to represent it 
-     * must be as large as the number space of the edge id. So it is typed eid_t
-     * And each item in edge_list array stands for a logical edge and stores
-     * the dest vertex id. So it is typed vid_t. 
+     * must be as large as the number space of the edge id. 
+     * And each item in edgeList[] array stands for a logical edge and stores
+     * the dest vertex id. 
      */
-    weight_t * weight_list;      // Stores the weights of edges
-    value_t  * value_list;       // Stores the values of vertices
-    vid_t    vertices;           // Number of vertices
-    eid_t    edges;              // Number of edges
+    Weight   * weightList;       // Stores the weights of edges
+    Value    * valueList;        // Stores the values of vertices
+    VertexId vertices;           // Number of vertices
+    EdgeId   edges;              // Number of edges
     bool     weighted;           // Whether we keep weight in edges
     bool     directed;           // Whether the graph is directed
     bool     valued;             // Whether we keep value in vertices
@@ -85,10 +84,10 @@ class Graph {
      *     vertex list (could contain a single value)
      *     edge list (could contain a single weight)
      *
-     * @param[in] graph_file: the path to the graph we want to read
+     * @param[in] graphFile: the path to the graph we want to read
      * @return SUCCESS if built, FAILURE otherwise 
      */
-    error_t initialize(const char * graph_file);
+    Error initialize(const char * graphFile);
 
     /**
      * Free all the allocated buffers.

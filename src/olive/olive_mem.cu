@@ -11,7 +11,7 @@
 #include "olive_mem.h"
 
 
-error_t olive_malloc(void ** ptr, size_t size, olive_mem_t type) {
+Error oliveMalloc(void ** ptr, size_t size, MemOperation type) {
     switch (type) {
     case OLIVE_MEM_HOST:
         * ptr = malloc(size);
@@ -41,13 +41,13 @@ error_t olive_malloc(void ** ptr, size_t size, olive_mem_t type) {
         if (cudaMalloc(ptr, size) != cudaSuccess) return FAILURE;
         break;
     default:
-        olive_fatal("invalid memory type");
+        oliveFatal("invalid memory type");
     }
     return SUCCESS;
 }
 
-error_t olive_calloc(void ** ptr, size_t size, olive_mem_t type) {
-    if (olive_malloc(ptr, size, type) != SUCCESS) return FAILURE;
+Error oliveCalloc(void ** ptr, size_t size, MemOperation type) {
+    if (oliveMalloc(ptr, size, type) != SUCCESS) return FAILURE;
     switch (type) {
     case OLIVE_MEM_HOST:
     case OLIVE_MEM_HOST_PINNED:
@@ -58,12 +58,12 @@ error_t olive_calloc(void ** ptr, size_t size, olive_mem_t type) {
         if (cudaMemset(* ptr, 0, size) != cudaSuccess) return FAILURE;
         break;
     default:
-        olive_fatal("invalid memory type");
+        oliveFatal("invalid memory type");
     }
     return SUCCESS;
 }
 
-error_t olive_free(void * ptr, olive_mem_t type) {
+Error oliveFree(void * ptr, MemOperation type) {
     switch (type) {
     case OLIVE_MEM_HOST:
         free(ptr);   // always succeed, guaranteed by OS
@@ -76,7 +76,7 @@ error_t olive_free(void * ptr, olive_mem_t type) {
         if (cudaFree(ptr) != cudaSuccess) return FAILURE;
         break;
     default:
-        olive_fatal("invalid memory type");
+        oliveFatal("invalid memory type");
     }
     return SUCCESS;
 }

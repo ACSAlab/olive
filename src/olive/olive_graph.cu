@@ -12,15 +12,15 @@
 #include "olive_util.h"
 
 
-error_t Graph::initialize(const char * graph_file) {
+Error Graph::initialize(const char * graphFile) {
     // Opens graph file
-    FILE * graph_file_handler;
-    graph_file_handler = fopen(graph_file, "r");
-    if (graph_file_handler == NULL) {
-        olive_error("cannot open graph file: %s", graph_file);
+    FILE * graphFileHandler;
+    graphFileHandler = fopen(graphFile, "r");
+    if (graphFileHandler == NULL) {
+        oliveError("cannot open graph file: %s", graphFile);
         return FAILURE;
     }
-    olive_log("reading from graph file: %s", graph_file);
+    oliveLog("reading from graph file: %s", graphFile);
     /**
      * Defines Data structures for parsing token
      * Here we use strsep(char**, char*) to get one token from line[]
@@ -36,33 +36,33 @@ error_t Graph::initialize(const char * graph_file) {
      * Parse metadata of the graph file (four lines). It is critical to build 
      * the graph in memory. The first line should be formatted as '# Nodes: 145'
      */
-    TRY(fgets(line, 1024, graph_file_handler), err_parse);
+    TRY(fgets(line, 1024, graphFileHandler), err_parse);
     remain = line;
     token = strsep(&remain, delims);
     TRY(strcmp(token, "#") == 0, err_parse);
     token = strsep(&remain, delims);
     TRY(strcmp(token, "Nodes:") == 0, err_parse);
     token = strsep(&remain, delims);
-    TRY(is_numeric(token), err_numeric);
-    vertices = static_cast<vid_t>(atoi(token));
-    olive_log("input graph has %d nodes", vertices);
+    TRY(isNumeric(token), err_numeric);
+    vertices = static_cast<VertexId>(atoi(token));
+    oliveLog("input graph has %d nodes", vertices);
     /**
      * The second line is expected to be '# Edges: 145'
      */
-    TRY(fgets(line, 1024, graph_file_handler), err_parse);
+    TRY(fgets(line, 1024, graphFileHandler), err_parse);
     remain = line;
     token = strsep(&remain, delims);
     TRY(strcmp(token, "#") == 0, err_parse);
     token = strsep(&remain, delims);
     TRY(strcmp(token, "Edges:") == 0, err_parse);
     token = strsep(&remain, delims);
-    TRY(is_numeric(token), err_numeric);
-    edges = static_cast<eid_t>(atoi(token));
-    olive_log("input graph has %d edges", edges);
+    TRY(isNumeric(token), err_numeric);
+    edges = static_cast<EdgeId>(atoi(token));
+    oliveLog("input graph has %d edges", edges);
     /**
      * The third line is expected to be '# Weighted' or '# Unweighted'
      */
-    TRY(fgets(line, 1024, graph_file_handler), err_parse);
+    TRY(fgets(line, 1024, graphFileHandler), err_parse);
     remain = line;
     token = strsep(&remain, delims);
     TRY(strcmp(token, "#") == 0, err_parse);
@@ -74,12 +74,12 @@ error_t Graph::initialize(const char * graph_file) {
     } else {
         goto err_parse;
     }
-    olive_log("input graph is %sweighted", weighted ? "" : "un");
+    oliveLog("input graph is %sweighted", weighted ? "" : "un");
     /** 
      * TODO(onesuper): support vertex-wise value later
      */
     valued = false;
-    olive_log("input graph is %svalued", valued ? "" : "in");
+    oliveLog("input graph is %svalued", valued ? "" : "in");
     /**
      * Allocate the graph in the host memory
      * The graph size is decided by the metadata  
@@ -87,62 +87,66 @@ error_t Graph::initialize(const char * graph_file) {
      * And it is possible to have 0 edges in a single-node graph.
      */
     if (vertices > 0) {
-        if (olive_malloc((void **) &vertex_list, (vertices + 1) * sizeof(eid_t),
-                         OLIVE_MEM_HOST) == FAILURE) {
-            olive_error("fail to allocate vertex list on host side");
-            fclose(graph_file_handler);
+        if (oliveMalloc(reinterpret_cast<void **> (&vertexList), 
+                        (vertices+1) * sizeof(EdgeId),
+                        OLIVE_MEM_HOST) == FAILURE) {
+            oliveError("fail to allocate vertex list on host side");
+            fclose(graphFileHandler);
             return FAILURE;
         }
-        olive_log("vertex list is allocated on host");
+        oliveLog("vertex list is allocated on host");
     }
     if (edges > 0) {
-        if (olive_malloc((void **) &edge_list, edges * sizeof(vid_t),
-                         OLIVE_MEM_HOST) == FAILURE) {
-            olive_error("fail to allocate edge list on host side");
-            fclose(graph_file_handler);
+        if (oliveMalloc(reinterpret_cast<void **> (&edgeList),
+                        edges * sizeof(VertexId),
+                        OLIVE_MEM_HOST) == FAILURE) {
+            oliveError("fail to allocate edge list on host side");
+            fclose(graphFileHandler);
             return FAILURE;
         }
-        olive_log("edge list is allocated on host");
+        oliveLog("edge list is allocated on host");
     }
     if (weighted) {
-        if (olive_malloc((void **) &weight_list, edges * sizeof(weight_t),
-                         OLIVE_MEM_HOST) == FAILURE) {
-            olive_error("fail to allocate weight list on host side");
-            fclose(graph_file_handler);
+        if (oliveMalloc(reinterpret_cast<void **> (&weightList),
+                        edges * sizeof(Weight),
+                        OLIVE_MEM_HOST) == FAILURE) {
+            oliveError("fail to allocate weight list on host side");
+            fclose(graphFileHandler);
             return FAILURE;
         }
-        olive_log("weight list is allocated on host");
+        oliveLog("weight list is allocated on host");
     }
     if (valued) {
-        if (olive_malloc((void **) &value_list, vertices * sizeof(value_t),
-                         OLIVE_MEM_HOST) == FAILURE) {
-            olive_error("fail to allocate value list on host side");
-            fclose(graph_file_handler);
+        if (oliveMalloc(reinterpret_cast<void **> (&valueList),
+                        vertices * sizeof(Value),
+                        OLIVE_MEM_HOST) == FAILURE) {
+            oliveError("fail to allocate value list on host side");
+            fclose(graphFileHandler);
             return FAILURE;
         }
-        olive_log("value is allocated on host");
+        oliveLog("value is allocated on host");
     }
     /**
      * Parse the graph data and sets up the vertex/edge/value/weight list
      * NOTE: the graph data is stored in CSR format. And there should be N+1
      * lines in the vertex list. The last vertex act as a sentinel
      */
-    olive_log("parsing vertex list from file...");
-    for (vid_t vid = 0; vid < vertices+1; vid++) {
-        TRY(fgets(line, 1024, graph_file_handler), err_parse);
+    oliveLog("parsing vertex list from file...");
+    for (VertexId vid = 0; vid < vertices+1; vid++) {
+        TRY(fgets(line, 1024, graphFileHandler), err_parse);
         remain = line;
         token = strsep(&remain, delims);
-        TRY(is_numeric(token), err_numeric);
-        vertex_list[vid] = static_cast<eid_t>(atoi(token));
+        TRY(isNumeric(token), err_numeric);
+        vertexList[vid] = static_cast<EdgeId>(atoi(token));
     }
-    olive_log("parsing edge list from file...");
+    oliveLog("parsing edge list from file...");
     // Parsing the edge list.
-    for (eid_t eid = 0; eid < edges; eid++) {
-        TRY(fgets(line, 1024, graph_file_handler), err_parse);
+    for (EdgeId eid = 0; eid < edges; eid++) {
+        TRY(fgets(line, 1024, graphFileHandler), err_parse);
         remain = line;
         token = strsep(&remain, delims);
-        TRY(is_numeric(token), err_numeric);
-        edge_list[eid] = static_cast<vid_t>(atoi(token));
+        TRY(isNumeric(token), err_numeric);
+        edgeList[eid] = static_cast<VertexId>(atoi(token));
         // The weight is associated with each edge line
         if (weighted) {
             token = strsep(&remain, delims);
@@ -150,40 +154,40 @@ error_t Graph::initialize(const char * graph_file) {
              * TODO(onesuper): the weight might possibly be a float number
              * make sure is_numeric support it!
              */
-            TRY(is_numeric(token), err_numeric);
-            weight_list[eid] = static_cast<weight_t>(atof(token));
+            TRY(isNumeric(token), err_numeric);
+            weightList[eid] = static_cast<Weight>(atof(token));
         }
     }
     // Close the file and return SUCCESS
-    fclose(graph_file_handler);
+    fclose(graphFileHandler);
     return SUCCESS;
     // Exception handlers
 err_parse:
-    fclose(graph_file_handler);
-    olive_error("parsing error: %s\n%s", token, line);
+    fclose(graphFileHandler);
+    oliveError("parsing error: %s\n%s", token, line);
     return FAILURE;
 err_numeric:
-    fclose(graph_file_handler);
-    olive_error("is expected to be numeric: %s\n%s", token, line);
+    fclose(graphFileHandler);
+    oliveError("is expected to be numeric: %s\n%s", token, line);
     return FAILURE;
 }
 
 
 void Graph::finalize(void) {
-    if (vertices > 0 && vertex_list) olive_free(vertex_list, OLIVE_MEM_HOST);
-    if (edges > 0 && edge_list) olive_free(edge_list, OLIVE_MEM_HOST);
-    if (weighted && weight_list) olive_free(weight_list, OLIVE_MEM_HOST);
-    if (valued && value_list) olive_free(value_list, OLIVE_MEM_HOST);
+    if (vertices > 0 && vertexList) oliveFree(vertexList, OLIVE_MEM_HOST);
+    if (edges > 0 && edgeList) oliveFree(edgeList, OLIVE_MEM_HOST);
+    if (weighted && weightList) oliveFree(weightList, OLIVE_MEM_HOST);
+    if (valued && valueList) oliveFree(valueList, OLIVE_MEM_HOST);
 }
 
 void Graph::print(void) {
     printf("\nVertex list\n");
-    for (vid_t vid = 0; vid < vertices+1; vid++) {
-        printf("%d ", vertex_list[vid]);
+    for (VertexId vid = 0; vid < vertices+1; vid++) {
+        printf("%d ", vertexList[vid]);
     }
     printf("\nEdge list\n");
-    for (eid_t eid = 0; eid < edges; eid++) {
-        printf("%d ", edge_list[eid]);
+    for (EdgeId eid = 0; eid < edges; eid++) {
+        printf("%d ", edgeList[eid]);
     }
     printf("\n");
 }

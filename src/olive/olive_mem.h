@@ -26,7 +26,7 @@ typedef enum {
                             // address space of the GPU memory. To refer the
                             // GPU-side space, cudaHostGetDevicePointer() must
                             // be called.
-} olive_mem_t;
+} MemOperation;
 
 
 /**
@@ -36,7 +36,7 @@ typedef enum {
  * @param[in] type: type of the memory to allocate
  * @return SUCCESS if the buffer has been allocated, FAILURE otherwise
  */
-error_t olive_malloc(void ** ptr, size_t size, olive_mem_t type);
+Error oliveMalloc(void ** ptr, size_t size, MemOperation type);
 
 
 /**
@@ -48,7 +48,7 @@ error_t olive_malloc(void ** ptr, size_t size, olive_mem_t type);
  * @param[in] type: type of the memory to allocate
  * @return SUCCESS if the buffer has been allocated, FAILURE otherwise
  */
-error_t totem_calloc(void ** ptr, size_t size, olive_mem_t type);
+Error oliveCalloc(void ** ptr, size_t size, MemOperation type);
 
 
 /**
@@ -58,7 +58,7 @@ error_t totem_calloc(void ** ptr, size_t size, olive_mem_t type);
  * @param[in] type: type of the memory to allocate
  * @return SUCCESS if the buffer has been allocated, FAILURE otherwise
  */
-error_t olive_free(void * ptr, olive_mem_t type);
+Error oliveFree(void * ptr, MemOperation type);
 
 
 #endif  // OLIVE_MEM_H

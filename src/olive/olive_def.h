@@ -28,7 +28,7 @@
 typedef enum {
     SUCCESS = 0,
     FAILURE
-} error_t;
+} Error;
 
 /**
  * Simulates simple exceptions: if the statement is not correct, jump to
@@ -71,42 +71,42 @@ typedef enum {
     } while (0);                     \
 
 /**
- * Timing info printer. Can be toggle off if wanted
+ * Timing info printer. Can be complied to no-op if wanted
  */
 #ifdef OLIVE_TIMING
-    #define olive_tim(...)                      \
+    #define oliveTim(...)                       \
         do {                                    \
-            fprintf(stdout, "[TIM] ");           \
+            fprintf(stdout, "[TIM] ");          \
             fprintf(stdout, __VA_ARGS__);       \
             fprintf(stdout, "\n");              \
             fflush(stdout);                     \
         } while (0);
 #else
-    #define olive_tim(...)  // disregarded
+    #define oliveTim(...)  // disregarded
 #endif
 
 /**
- * Logging info printer. Can be toggle off if wanted
+ * Logging info printer. Can be complied to no-op if wanted
  */
 #ifdef OLIVE_LOGGING
-    #define olive_log(...)                      \
+    #define oliveLog(...)                       \
         do {                                    \
-            fprintf(stdout, "[LOG] ");           \
+            fprintf(stdout, "[LOG] ");          \
             fprintf(stdout, __VA_ARGS__);       \
             fprintf(stdout, "\n");              \
             fflush(stdout);                     \
         } while (0);
 #else
-    #define olive_log(...)  // disregarded
+    #define oliveLog(...)  // disregarded
 #endif
 
 /**
  * Fatal error (can not be disregarded)
  * Print the message and quit program immediately
  */
-#define olive_fatal(...)                        \
+#define oliveFatal(...)                         \
     do {                                        \
-        fprintf(stderr, "[FATAL] ");             \
+        fprintf(stderr, "[FATAL] ");            \
         fprintf(stderr, __VA_ARGS__);           \
         fprintf(stderr, "\n");                  \
         fflush(stdout);                         \
@@ -117,7 +117,7 @@ typedef enum {
  * Fatal error (can not be disregarded)
  * Print the message and let the program handle it
  */
-#define olive_error(...)                        \
+#define oliveError(...)                         \
     do {                                        \
         fprintf(stderr, "Error: ");             \
         fprintf(stderr, __VA_ARGS__);           \

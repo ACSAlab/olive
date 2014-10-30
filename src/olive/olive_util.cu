@@ -11,23 +11,23 @@
 #include "olive_util.h"
 
 
-int get_num_gpus(void) {
+int getNumGpus(void) {
     int num = 1;
     CUT_CALL_SAFE(cudaGetDeviceCount(&num));
     return num;
 }
 
-void set_gpu_num(int num) {
+void setGpuNum(int num) {
     CUT_CALL_SAFE(cudaSetDevice(num));
 }
 
-void check_available_memory(void) {
+void checkAvailableMemory(void) {
     size_t available = 0; size_t total = 0;
     CUT_CALL_SAFE(cudaMemGetInfo(&available, &total));
-    olive_log("available memory: %llu / %llu", available, total);
+    oliveLog("available memory: %llu / %llu", available, total);
 }
 
-bool is_numeric(char * str) {
+bool isNumeric(char * str) {
   assert(str);
   while ((* str) != '\0') {
     if (!isdigit(* str)) {
@@ -39,7 +39,7 @@ bool is_numeric(char * str) {
   return true;
 }
 
-double Timer::get_time(void) {
+double Timer::getTime(void) {
     cudaThreadSynchronize();
     timeval t;
     gettimeofday(&t, NULL);
@@ -48,11 +48,11 @@ double Timer::get_time(void) {
 }
 
 void Timer::initialize(void) {
-    this->last_time = get_time();
+    this->last_time = getTime();
 }
 
-double Timer::elapsed_time(void) {
-    double new_time = get_time();
+double Timer::elapsedTime(void) {
+    double new_time = getTime();
     double elapesed = new_time - this->last_time;
     this->last_time = new_time;
     return elapesed;
