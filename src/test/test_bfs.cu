@@ -8,12 +8,16 @@
 
 // olive includes
 #include "olive_graph.h"
-
-#define GRAPH_ROOT(graph_file) "../data/"graph_file
+#include <stdio.h>
 
 int main(int argc, char** argv) {
+    if (argc < 2) {
+        printf("wrong argument");
+        return 1;
+    }
+
     Graph g;
-    g.initialize(GRAPH_ROOT("merrill.csr"));
+    g.initialize(argv[1]);
     g.print();
     g.finalize();
     return 0;

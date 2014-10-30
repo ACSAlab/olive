@@ -1,6 +1,9 @@
 /**
  * An interface for CPU/GPU hybrid memory management
  *
+ * The memory interface provide a universal view for memory management
+ * TODO(onesuper): use templates to rewrite the interface
+ *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-10-22
  * Last Modified: 2014-10-22
@@ -39,7 +42,7 @@ error_t olive_malloc(void ** ptr, size_t size, olive_mem_t type);
 /**
  * Similar to olive_malloc() with the difference that the allocated space is
  * filled with zeros.
- * the buffer can be either pinned or not.
+ * The buffer can be either pinned or not.
  * @param[out] ptr: a pointer to the allocated space 
  * @param[in] size: buffer size to allocate
  * @param[in] type: type of the memory to allocate
@@ -58,4 +61,4 @@ error_t totem_calloc(void ** ptr, size_t size, olive_mem_t type);
 error_t olive_free(void * ptr, olive_mem_t type);
 
 
-#endif // OLIVE_MEM_H
+#endif  // OLIVE_MEM_H

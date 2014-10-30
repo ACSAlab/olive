@@ -76,7 +76,7 @@ typedef enum {
 #ifdef OLIVE_TIMING
     #define olive_tim(...)                      \
         do {                                    \
-            fprintf(stdout, "Tim: ");           \
+            fprintf(stdout, "[TIM] ");           \
             fprintf(stdout, __VA_ARGS__);       \
             fprintf(stdout, "\n");              \
             fflush(stdout);                     \
@@ -91,7 +91,7 @@ typedef enum {
 #ifdef OLIVE_LOGGING
     #define olive_log(...)                      \
         do {                                    \
-            fprintf(stdout, "Log: ");           \
+            fprintf(stdout, "[LOG] ");           \
             fprintf(stdout, __VA_ARGS__);       \
             fprintf(stdout, "\n");              \
             fflush(stdout);                     \
@@ -106,7 +106,7 @@ typedef enum {
  */
 #define olive_fatal(...)                        \
     do {                                        \
-        fprintf(stderr, "Fatal: ");             \
+        fprintf(stderr, "[FATAL] ");             \
         fprintf(stderr, __VA_ARGS__);           \
         fprintf(stderr, "\n");                  \
         fflush(stdout);                         \

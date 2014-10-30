@@ -44,7 +44,7 @@ double Timer::get_time(void) {
     timeval t;
     gettimeofday(&t, NULL);
     return static_cast<double> (t.tv_sec) +
-        static_cast<double> (t.tv_usec / 1000000);
+           static_cast<double> (t.tv_usec / 1000000);
 }
 
 void Timer::initialize(void) {

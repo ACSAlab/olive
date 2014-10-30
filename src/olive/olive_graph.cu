@@ -87,24 +87,40 @@ error_t Graph::initialize(const char * graph_file) {
      * And it is possible to have 0 edges in a single-node graph.
      */
     if (vertices > 0) {
-        TRY(olive_malloc((void **) &vertex_list, (vertices + 1) * sizeof(eid_t),
-                         OLIVE_MEM_HOST), err_host_alloc);
-        olive_log("vertex list has been allocated on host");
+        if (olive_malloc((void **) &vertex_list, (vertices + 1) * sizeof(eid_t),
+                         OLIVE_MEM_HOST) == FAILURE) {
+            olive_error("fail to allocate vertex list on host side");
+            fclose(graph_file_handler);
+            return FAILURE;
+        }
+        olive_log("vertex list is allocated on host");
     }
     if (edges > 0) {
-        TRY(olive_malloc((void **) &edge_list, edges * sizeof(vid_t),
-                         OLIVE_MEM_HOST), err_host_alloc);
-        olive_log("edge list has been allocated on host");
+        if (olive_malloc((void **) &edge_list, edges * sizeof(vid_t),
+                         OLIVE_MEM_HOST) == FAILURE) {
+            olive_error("fail to allocate edge list on host side");
+            fclose(graph_file_handler);
+            return FAILURE;
+        }
+        olive_log("edge list is allocated on host");
     }
     if (weighted) {
-        TRY(olive_malloc((void **) &weight_list, edges * sizeof(weight_t),
-                         OLIVE_MEM_HOST), err_host_alloc);
-        olive_log("weight list has been allocated on host");
+        if (olive_malloc((void **) &weight_list, edges * sizeof(weight_t),
+                         OLIVE_MEM_HOST) == FAILURE) {
+            olive_error("fail to allocate weight list on host side");
+            fclose(graph_file_handler);
+            return FAILURE;
+        }
+        olive_log("weight list is allocated on host");
     }
     if (valued) {
-        TRY(olive_malloc((void **) &value_list, vertices * sizeof(value_t),
-                         OLIVE_MEM_HOST), err_host_alloc);
-        olive_log("value list has been allocated on host");
+        if (olive_malloc((void **) &value_list, vertices * sizeof(value_t),
+                         OLIVE_MEM_HOST) == FAILURE) {
+            olive_error("fail to allocate value list on host side");
+            fclose(graph_file_handler);
+            return FAILURE;
+        }
+        olive_log("value is allocated on host");
     }
     /**
      * Parse the graph data and sets up the vertex/edge/value/weight list
@@ -150,27 +166,25 @@ err_numeric:
     fclose(graph_file_handler);
     olive_error("is expected to be numeric: %s\n%s", token, line);
     return FAILURE;
-err_host_alloc:
-    fclose(graph_file_handler);
-    olive_error("fail to allocate the graph on host side");
-    return FAILURE;
 }
 
+
 void Graph::finalize(void) {
-    if (vertex_list) olive_free(vertex_list, OLIVE_MEM_HOST);
-    if (edge_list)   olive_free(edge_list, OLIVE_MEM_HOST);
-    if (weight_list) olive_free(weight_list, OLIVE_MEM_HOST);
-    if (value_list)  olive_free(value_list, OLIVE_MEM_HOST);
+    if (vertices > 0 && vertex_list) olive_free(vertex_list, OLIVE_MEM_HOST);
+    if (edges > 0 && edge_list) olive_free(edge_list, OLIVE_MEM_HOST);
+    if (weighted && weight_list) olive_free(weight_list, OLIVE_MEM_HOST);
+    if (valued && value_list) olive_free(value_list, OLIVE_MEM_HOST);
 }
 
 void Graph::print(void) {
-    // Print the vertex list
+    printf("\nVertex list\n");
     for (vid_t vid = 0; vid < vertices+1; vid++) {
         printf("%d ", vertex_list[vid]);
     }
-    // Print the edge list
+    printf("\nEdge list\n");
     for (eid_t eid = 0; eid < edges; eid++) {
         printf("%d ", edge_list[eid]);
     }
+    printf("\n");
 }
 

@@ -108,9 +108,9 @@ all: libs
 #-------------------------------------------------------------------------------
 # Archive all the objects into a static library
 #-------------------------------------------------------------------------------
-libs: $(LIB_DIR) $(LIB_DIR)/libolive.a
+libs: $(LIB_DIR)/libolive.a
 
-$(LIB_DIR)/libolive.a: objects
+$(LIB_DIR)/libolive.a: $(LIB_DIR) objects
 	@echo "Creating library: " $@
 	@ar -r -u $@ $(CUOBJS)
 
@@ -120,7 +120,7 @@ $(LIB_DIR)/libolive.a: objects
 #-------------------------------------------------------------------------------
 objects: $(OBJ_DIR) $(CUOBJS)
 
-$(OBJ_DIR)/%.cu.o: $(OLIVE_DIR)/%.cu $(DEPS)
+$(OBJ_DIR)/%.cu.o:  $(OLIVE_DIR)/%.cu $(DEPS)
 	@echo "Creating cuda object: "$@
 	@$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) -c
 
@@ -130,8 +130,8 @@ $(OBJ_DIR)/%.cu.o: $(OLIVE_DIR)/%.cu $(DEPS)
 #-------------------------------------------------------------------------------
 bfs: $(BIN_DIR) $(BIN_DIR)/test_bfs
 
-$(BIN_DIR)/test_bfs: $(TEST_DIR)/test_bfs.cu $(LIB_DIR)/libolive.a $(DEPS)
-	@echo "building executable: "$@	
+$(BIN_DIR)/test_bfs: $(TEST_DIR)/test_bfs.cu libs $(DEPS)
+	@echo "Building executable: "$@	
 	@$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) $(LIB_DIR)/libolive.a
 
 

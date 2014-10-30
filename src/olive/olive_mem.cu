@@ -46,13 +46,13 @@ error_t olive_malloc(void ** ptr, size_t size, olive_mem_t type) {
     return SUCCESS;
 }
 
-error_t olive_calloc(void** ptr, size_t size, olive_mem_t type) {
+error_t olive_calloc(void ** ptr, size_t size, olive_mem_t type) {
     if (olive_malloc(ptr, size, type) != SUCCESS) return FAILURE;
     switch (type) {
     case OLIVE_MEM_HOST:
     case OLIVE_MEM_HOST_PINNED:
     case OLIVE_MEM_HOST_MAPPED:
-        memset(* ptr, 0, size);
+        memset(* ptr, 0, size);  // always succeed, guaranteed by OS
         break;
     case OLIVE_MEM_DEVICE:
         if (cudaMemset(* ptr, 0, size) != cudaSuccess) return FAILURE;
@@ -66,14 +66,14 @@ error_t olive_calloc(void** ptr, size_t size, olive_mem_t type) {
 error_t olive_free(void * ptr, olive_mem_t type) {
     switch (type) {
     case OLIVE_MEM_HOST:
-        free(ptr);
+        free(ptr);   // always succeed, guaranteed by OS
         break;
     case OLIVE_MEM_HOST_PINNED:
     case OLIVE_MEM_HOST_MAPPED:
-        if (cudaFreeHost(ptr)) return FAILURE;
+        if (cudaFreeHost(ptr) != cudaSuccess) return FAILURE;
         break;
     case OLIVE_MEM_DEVICE:
-        if (cudaFree(ptr)) return FAILURE;
+        if (cudaFree(ptr) != cudaSuccess) return FAILURE;
         break;
     default:
         olive_fatal("invalid memory type");
