@@ -20,11 +20,13 @@ disable_l1_cache = 0
 #-------------------------------------------------------------------------------
 # Directories
 #-------------------------------------------------------------------------------
-PROJECT_ROOT = ../..
+PROJECT_ROOT = ..
 OLIVE_DIR = $(PROJECT_ROOT)/src/olive
+TEST_DIR = $(PROJECT_ROOT)/src/test
 BUILD_DIR = $(PROJECT_ROOT)/build
 OBJ_DIR = $(BUILD_DIR)/obj
 BIN_DIR = $(BUILD_DIR)/bin
+LIB_DIR = $(BUILD_DIR)/lib
 
 
 #-------------------------------------------------------------------------------
@@ -70,10 +72,9 @@ else
 endif
 
 #-------------------------------------------------------------------------------
-# 64 or 32 bit
+# 64 or 32 bit (compile with 32-bit device pointers by default)
 #-------------------------------------------------------------------------------
 ifneq ($(force64), 1)
-	# Compile with 32-bit device pointers by default
 	NVCCFLAGS += -m32
 	CCFLAGS += -m32
 else
@@ -83,10 +84,9 @@ endif
 
 
 #-------------------------------------------------------------------------------
-# Includes (src and include bothin in OLIVE_DIR)
+# Includes (src and include are both in OLIVE_DIR)
 #-------------------------------------------------------------------------------
 INC = -I$(OLIVE_DIR)
-
 
 
 #-------------------------------------------------------------------------------
@@ -98,8 +98,25 @@ DEPS = $(wildcard $(OLIVE_DIR)/*.h)
 
 
 #-------------------------------------------------------------------------------
+# Fake Targets
+#-------------------------------------------------------------------------------
+all: libs
+
+.PHONY: clean clean-bin clean-all objects bfs
+
+
+#-------------------------------------------------------------------------------
+# Archive all the objects into a static library
+#-------------------------------------------------------------------------------
+libs: $(LIB_DIR) $(LIB_DIR)/libolive.a
+
+$(LIB_DIR)/libolive.a: objects
+	@echo "Creating library: " $@
+	@ar -r -u $@ $(CUOBJS)
+
+
+#-------------------------------------------------------------------------------
 # Target/common rule for building olive codes
-# Use make objects to build the objects only
 #-------------------------------------------------------------------------------
 objects: $(OBJ_DIR) $(CUOBJS)
 
@@ -109,19 +126,13 @@ $(OBJ_DIR)/%.cu.o: $(OLIVE_DIR)/%.cu $(DEPS)
 
 
 #-------------------------------------------------------------------------------
-# Targets
-#-------------------------------------------------------------------------------
-.PHONY: clean clean-bin clean-all bfs
-
-
-#-------------------------------------------------------------------------------
 # Rules for BFS
 #-------------------------------------------------------------------------------
 bfs: $(BIN_DIR) $(BIN_DIR)/test_bfs
 
-$(BIN_DIR)/test_bfs: test_bfs.cu objects $(DEPS)
-	@printf "Building bfs...\n"
-	@$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC)
+$(BIN_DIR)/test_bfs: $(TEST_DIR)/test_bfs.cu $(LIB_DIR)/libolive.a $(DEPS)
+	@echo "building executable: "$@	
+	@$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) $(LIB_DIR)/libolive.a
 
 
 #-------------------------------------------------------------------------------
@@ -133,11 +144,15 @@ $(BIN_DIR): $(BUILD_DIR)
 $(OBJ_DIR): $(BUILD_DIR)
 	@mkdir -p $(OBJ_DIR)
 
+$(LIB_DIR): $(BUILD_DIR)
+	@mkdir -p $(LIB_DIR)
+
 $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
 
+
 #-------------------------------------------------------------------------------
-# Clean
+# Cleaning up
 #-------------------------------------------------------------------------------
 clean:
 	rm -f $(OBJ_DIR)/*.o 
