@@ -48,22 +48,20 @@ typedef float Value;
 class Graph {
  private:
     /**
-     * Stores the starting index of vertex i's adjacent list in
-     * edge_list array. We can be aware of the size of its adjacent list by
-     * simply calculating vertexList[i+1] - vertexList[i].
+     * Stores the starting index of vertex's outgoing edges in edgeList array.
+     * We can be aware of number of vertex i's outgoing edges by calculating 
+     * vertexList[i+1] - vertexList[i].
      */
     EdgeId   * vertexList;
     /**
-     * Stores the array of dest vertex ids for outgoing edges.
-     * e.g. From edgeList[vertexList[i]] stores i's neibours' ids. 
+     * Stores the destination vertex ids for outgoing edges.
      */
     VertexId * edgeList;
     /**
-     * NOTE: each item in vertexList[] array stands for a logical vertex. And it
-     * stores the indices to query outgoing edges. The number to represent it 
-     * must be as large as the number space of the edge id. 
-     * And each item in edgeList[] array stands for a logical edge and stores
-     * the dest vertex id. 
+     * NOTE: each item in vertexList array stands for a *logical* vertex.
+     * Physically, it is an index to query its outgoing edges. 
+     * And each item in edgeList array stands for a *logical* edge.
+     * Physically, it is a destination vertex id. 
      */
     Weight   * weightList;       // Stores the weights of edges
     Value    * valueList;        // Stores the values of vertices
