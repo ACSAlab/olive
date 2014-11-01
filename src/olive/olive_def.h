@@ -61,8 +61,7 @@ typedef enum {
     } while (0);
 
 /**
- * CUT_CALL_SAFE is used to wrap around the cuda runtime call to 
- * check if it causes any error.
+ * Wraps around the cuda runtime call to check if it causes any error.
  */
 #define CUT_CALL_SAFE(func_call)     \
     do {                             \
@@ -71,7 +70,7 @@ typedef enum {
     } while (0);                     \
 
 /**
- * Timing info printer. Can be complied to no-op if wanted
+ * Timing info printer. Can be complied to no-op if wanted.
  */
 #ifdef OLIVE_TIMING
     #define oliveTim(...)                       \
@@ -82,11 +81,11 @@ typedef enum {
             fflush(stdout);                     \
         } while (0);
 #else
-    #define oliveTim(...)  // disregarded
+    #define oliveTim(...)  // no-op
 #endif
 
 /**
- * Logging info printer. Can be complied to no-op if wanted
+ * Logging info printer. Can be complied to no-op if wanted.
  */
 #ifdef OLIVE_LOGGING
     #define oliveLog(...)                       \
@@ -97,12 +96,12 @@ typedef enum {
             fflush(stdout);                     \
         } while (0);
 #else
-    #define oliveLog(...)  // disregarded
+    #define oliveLog(...)  // no-op
 #endif
 
 /**
- * Fatal error (can not be disregarded)
- * Print the message and quit program immediately
+ * Fatal errors
+ * Print the message and quit program immediately.
  */
 #define oliveFatal(...)                         \
     do {                                        \
@@ -114,8 +113,8 @@ typedef enum {
     } while (0);
 
 /**
- * Fatal error (can not be disregarded)
- * Print the message and let the program handle it
+ * Ordinary errors
+ * Print the message and let the program handle it.
  */
 #define oliveError(...)                         \
     do {                                        \

@@ -33,8 +33,8 @@ Error Graph::initialize(const char * graphFile) {
     char * remain;                  // Stores the remainder of the line
     const char delims[] = " \t\n";  // Delimiters to separate tokens
     /**
-     * Parse metadata of the graph file (four lines). It is critical to build 
-     * the graph in memory. The first line should be formatted as '# Nodes: 145'
+     * Parse metadata of the graph file. 
+     * The first line is expected to be '# Nodes: 145'
      */
     TRY(fgets(line, 1024, graphFileHandler), err_parse);
     remain = line;
@@ -81,13 +81,13 @@ Error Graph::initialize(const char * graphFile) {
     valued = false;
     oliveLog("input graph is %svalued", valued ? "" : "in");
     /**
-     * Allocate the graph in the host memory
-     * The graph size is decided by the metadata  
-     * NOTE: the len of vertex_list[] is N+1. 
+     * Allocate the graph in the host memory.
+     * The graph size is described by the metadata.
+     * NOTE: the length of vertexList is N+1. 
      * And it is possible to have 0 edges in a single-node graph.
      */
     if (vertices > 0) {
-        if (oliveMalloc(reinterpret_cast<void **> (&vertexList), 
+        if (oliveMalloc(reinterpret_cast<void **> (&vertexList),
                         (vertices+1) * sizeof(EdgeId),
                         OLIVE_MEM_HOST) == FAILURE) {
             oliveError("fail to allocate vertex list on host side");
@@ -127,9 +127,9 @@ Error Graph::initialize(const char * graphFile) {
         oliveLog("value is allocated on host");
     }
     /**
-     * Parse the graph data and sets up the vertex/edge/value/weight list
+     * Parse the graph data and fill up the buffers.
      * NOTE: the graph data is stored in CSR format. And there should be N+1
-     * lines in the vertex list. The last vertex act as a sentinel
+     * lines in the vertex list. The last vertex act as a sentinel.
      */
     oliveLog("parsing vertex list from file...");
     for (VertexId vid = 0; vid < vertices+1; vid++) {
@@ -147,12 +147,12 @@ Error Graph::initialize(const char * graphFile) {
         token = strsep(&remain, delims);
         TRY(isNumeric(token), err_numeric);
         edgeList[eid] = static_cast<VertexId>(atoi(token));
-        // The weight is associated with each edge line
+        // The weight is associated with each edge line.
         if (weighted) {
             token = strsep(&remain, delims);
             /**
-             * TODO(onesuper): the weight might possibly be a float number
-             * make sure is_numeric support it!
+             * TODO(onesuper): the weight might possibly be a float number.
+             * Make sure isNumeric() accepts it!
              */
             TRY(isNumeric(token), err_numeric);
             weightList[eid] = static_cast<Weight>(atof(token));
