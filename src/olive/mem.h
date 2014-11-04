@@ -10,12 +10,10 @@
  */
 
 
-#ifndef OLIVE_MEM_H
-#define OLIVE_MEM_H
+#pragma once
 
-#include "olive_def.h"
-
-
+#include "def.h"
+ 
 /**
  * Memory operation type. We pass the type as parameter to 
  * differetiate the behavior for memory allocation.
@@ -92,5 +90,3 @@ Error oliveFree(void * ptr, MemOp memOp);
     ((cudaHostGetDevicePointer(pDevice, pHost, 0) == cudaSuccess) ? SUCCESS : FAILURE)
 
 
-
-#endif  // OLIVE_MEM_H

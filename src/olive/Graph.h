@@ -7,11 +7,10 @@
  */
 
 
-#ifndef OLIVE_GRAPH_H
-#define OLIVE_GRAPH_H
+#pragma once
 
-
-#include "olive_def.h"
+#include <stdint.h>
+#include "def.h"
 
 
 /**
@@ -86,5 +85,4 @@ class Graph {
     ~Graph(void) {}
 };
 
-#endif  // OLIVE_GRAPH
 

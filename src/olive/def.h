@@ -7,20 +7,14 @@
  */
 
 
-#ifndef OLIVE_DEF_H
-#define OLIVE_DEF_H
+#pragma once
 
-// System includes
 #include <assert.h>
-#include <cuda.h>
-#include <sys/time.h>
-#include <stdint.h>
-#include <string.h>
-#include <ctype.h>
-#include <stdlib.h>
 #include <stdio.h>
 
-// Toggles on/off the timing/logging information
+/**
+ * Toggles on/off the logging information
+ */
 #define OLIVE_TIMING
 #define OLIVE_LOGGING
 
@@ -41,15 +35,6 @@ typedef enum {
         if (!(stmt))                    \
         goto label;                     \
     } while (0);
-
-/**
- * Wraps around the cuda runtime call to check if it causes any error.
- */
-#define CUT_CALL_SAFE(func_call)     \
-    do {                             \
-        func_call;                   \
-        CUT_CHECK_ERROR();           \
-    } while (0);                     \
 
 /**
  * Timing info printer. Can be complied to no-op if wanted.
@@ -120,4 +105,3 @@ typedef enum {
         fflush(stdout);                                     \
     } while (0);
 
-#endif  // OLIVE_DEF

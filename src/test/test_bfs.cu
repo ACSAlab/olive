@@ -7,9 +7,9 @@
  */
 
 // olive includes
-#include "olive_graphH.h"
-#include "olive_graphD.h"
-#include "olive_util.h"
+#include "GraphH.h"
+#include "GraphD.h"
+#include "util.h"
 
 #include <stdio.h>
 

@@ -7,11 +7,11 @@
  */
 
 
-#ifndef OLIVE_GRAPHD_H
-#define OLIVE_GRAPHD_H
+#pragma once
 
-#include "olive_def.h"
-#include "olive_graphH.h"
+#include "def.h"
+#include "Graph.h"
+#include "GraphH.h"
 
 /**
  * Memory kind of GraphD 
@@ -74,4 +74,3 @@ class GraphD: public Graph {
     ~GraphD(void) { finalize(); }
 };
 
-#endif  // OLIVE_GRAPHD

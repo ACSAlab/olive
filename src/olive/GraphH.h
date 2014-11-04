@@ -7,12 +7,10 @@
  */
 
 
-#ifndef OLIVE_GRAPHH_H
-#define OLIVE_GRAPHH_H
+#pragma once
 
-
-#include "olive_def.h"
-#include "olive_graph.h"
+#include "def.h"
+#include "Graph.h"
 
 class GraphH : public Graph {
  public:
@@ -49,4 +47,3 @@ class GraphH : public Graph {
 };
 
 
-#endif  // OLIVE_GRAPHH

@@ -6,10 +6,11 @@
  * Last Modified: 2014-10-23
  */
 
-
-
-#include "olive_util.h"
-
+#include <sys/time.h>
+#include <cuda.h>
+#include <ctype.h>
+ 
+#include "util.h"
 
 int getGpuNum(void) {
     int num = 1;

@@ -6,9 +6,9 @@
  * Last Modified: 2014-11-04
  */
 
-
-#include "olive_mem.h"
-
+#include <cuda.h>
+ 
+#include "mem.h"
 
 Error oliveMalloc(void ** ptr, size_t size, MemOp memOp) {
     cudaError_t err;

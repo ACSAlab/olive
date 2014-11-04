@@ -7,10 +7,9 @@
  */
 
 
-#ifndef OLIVE_UTIL_H
-#define OLIVE_UTIL_H
+#pragma once
 
-#include "olive_def.h"
+#include "def.h"
 
 // @return the number of the GPUs
 int getGpuNum(void);
@@ -44,7 +43,4 @@ class Timer {
     double elapsedTime(void);
 };
 
-
-
-#endif  // OLIVE_UTIL_H
 

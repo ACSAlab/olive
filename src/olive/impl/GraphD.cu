@@ -6,8 +6,9 @@
  * Last Modified: 2014-11-02
  */
 
-#include "olive_graphD.h"
-#include "olive_mem.h"
+#include "GraphD.h"
+
+#include "mem.h"
 
 
 Error GraphD::fromGraphH(const GraphH & graphH, GraphDMem mem) {

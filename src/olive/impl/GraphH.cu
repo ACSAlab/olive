@@ -6,10 +6,12 @@
  * Last Modified: 2014-11-04
  */
 
-
-#include "olive_graphH.h"
-#include "olive_mem.h"
-#include "olive_util.h"
+#include <string.h>
+#include <stdlib.h>
+ 
+#include "GraphH.h"
+#include "mem.h"
+#include "util.h"
 
 
 Error GraphH::fromFile(const char * graphFile) {

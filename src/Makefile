@@ -22,6 +22,7 @@ disable_l1_cache = 0
 #-------------------------------------------------------------------------------
 PROJECT_ROOT = ..
 OLIVE_DIR = $(PROJECT_ROOT)/src/olive
+IMPL_DIR = $(OLIVE_DIR)/impl
 TEST_DIR = $(PROJECT_ROOT)/src/test
 BUILD_DIR = $(PROJECT_ROOT)/build
 OBJ_DIR = $(BUILD_DIR)/obj
@@ -92,9 +93,9 @@ INC = -I$(OLIVE_DIR)
 #-------------------------------------------------------------------------------
 # Generates the name lists for building
 #-------------------------------------------------------------------------------
-CUSRC   = $(wildcard $(OLIVE_DIR)/*.cu)  
-CUOBJS  = $(patsubst $(OLIVE_DIR)/%.cu, $(OBJ_DIR)/%.cu.o, $(CUSRC)) 
-DEPS = $(wildcard $(OLIVE_DIR)/*.h)
+CUSRC   = $(wildcard $(IMPL_DIR)/*.cu)  
+CUOBJS  = $(patsubst $(IMPL_DIR)/%.cu, $(OBJ_DIR)/%.cu.o, $(CUSRC)) 
+DEPS    = $(wildcard $(OLIVE_DIR)/*.h)
 
 
 #-------------------------------------------------------------------------------
@@ -120,7 +121,7 @@ $(LIB_DIR)/libolive.a: $(LIB_DIR) objects
 #-------------------------------------------------------------------------------
 objects: $(OBJ_DIR) $(CUOBJS)
 
-$(OBJ_DIR)/%.cu.o:  $(OLIVE_DIR)/%.cu $(DEPS)
+$(OBJ_DIR)/%.cu.o:  $(IMPL_DIR)/%.cu $(DEPS)
 	@echo "Creating cuda object: "$@
 	@$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) -c
 
@@ -130,7 +131,7 @@ $(OBJ_DIR)/%.cu.o:  $(OLIVE_DIR)/%.cu $(DEPS)
 #-------------------------------------------------------------------------------
 bfs: $(BIN_DIR) $(BIN_DIR)/test_bfs
 
-$(BIN_DIR)/test_bfs: $(TEST_DIR)/test_bfs.cu libs $(DEPS)
+$(BIN_DIR)/test_bfs: $(TEST_DIR)/test_bfs.cu libs
 	@echo "Building executable: "$@	
 	@$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) $(LIB_DIR)/libolive.a
 
