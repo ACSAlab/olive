@@ -13,7 +13,7 @@
 #include "olive_def.h"
 
 // @return the number of the GPUs
-int getNumGpus(void);
+int getGpuNum(void);
 
 // set the number of GPUs
 void setGpuNum(int num);
@@ -23,7 +23,7 @@ void checkAvailableMemory(void);
 
 /**
  * Checks if the string is a numeric number
- * @param[in] str: the string to check
+ * @param str the string to check
  * @return true if the string represents a numeric number
  */
 bool isNumeric(char * str);

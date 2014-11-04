@@ -11,20 +11,29 @@
 #include "olive_util.h"
 
 
-int getNumGpus(void) {
+int getGpuNum(void) {
     int num = 1;
-    CUT_CALL_SAFE(cudaGetDeviceCount(&num));
+    if (cudaGetDeviceCount(&num) != cudaSuccess) {
+        oliveError("fail to get device count");
+    }
     return num;
 }
 
 void setGpuNum(int num) {
-    CUT_CALL_SAFE(cudaSetDevice(num));
+    if (cudaGetDeviceCount(&num) != cudaSuccess) {
+        oliveError("fail to set device count: %d", num);
+    }
 }
 
 void checkAvailableMemory(void) {
     size_t available = 0; size_t total = 0;
-    CUT_CALL_SAFE(cudaMemGetInfo(&available, &total));
-    oliveLog("available memory: %llu / %llu", available, total);
+    cudaError_t err;
+    err = cudaMemGetInfo(&available, &total);
+    if (err == cudaSuccess) {
+        printf("available memory: %llu / %llu\n", available, total);
+    } else {
+        oliveError("fail to check available memory");
+    }
 }
 
 bool isNumeric(char * str) {
@@ -43,8 +52,7 @@ double Timer::getTime(void) {
     cudaThreadSynchronize();
     timeval t;
     gettimeofday(&t, NULL);
-    return static_cast<double> (t.tv_sec) +
-           static_cast<double> (t.tv_usec / 1000000);
+    return static_cast<double>(t.tv_sec)+static_cast<double>(t.tv_usec/1000000);
 }
 
 void Timer::initialize(void) {

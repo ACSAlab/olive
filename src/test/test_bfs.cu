@@ -3,11 +3,14 @@
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-10-28
- * Last Modified: 2014-10-28
+ * Last Modified: 2014-11-04
  */
 
 // olive includes
-#include "olive_graph.h"
+#include "olive_graphH.h"
+#include "olive_graphD.h"
+#include "olive_util.h"
+
 #include <stdio.h>
 
 int main(int argc, char** argv) {
@@ -16,9 +19,16 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    Graph g;
-    g.initialize(argv[1]);
-    g.print();
-    g.finalize();
+    printf("device count: %d\n", getGpuNum());
+    checkAvailableMemory();
+
+    GraphH graphH;
+    graphH.fromFile(argv[1]);
+    graphH.print();
+
+    GraphD graphD;
+    graphD.fromGraphH(graphH);
+
+
     return 0;
 }

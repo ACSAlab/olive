@@ -24,10 +24,12 @@
 #define OLIVE_TIMING
 #define OLIVE_LOGGING
 
-// Generic success and failure
+/**
+ * Generic success and failure
+ */
 typedef enum {
     SUCCESS = 0,
-    FAILURE
+    FAILURE,
 } Error;
 
 /**
@@ -38,26 +40,6 @@ typedef enum {
     do {                                \
         if (!(stmt))                    \
         goto label;                     \
-    } while (0);
-
-/**
- * Cuda runtime error checking. The cuda runtime errors will be treated as
- * fatal errors and will make the program exit.
- */
-#define CUT_CHECK_ERROR()                                           \
-    do {                                                            \
-        cudaError_t err = cudaGetLastError();                       \
-        if (cudaSuccess != err) {                                   \
-            fprintf(stderr, "CudaError<%s : %i> : %s.\n",           \
-                    __FILE__, __LINE__, cudaGetErrorString(err) );  \
-            assert(0);                                              \
-        }                                                           \
-        err = cudaThreadSynchronize();                              \
-        if (cudaSuccess != err) {                                   \
-            fprintf(stderr, "CudaError<%s : %i> : %s.\n",          \
-                    __FILE__, __LINE__, cudaGetErrorString(err) );  \
-            assert(0);                                              \
-        }                                                           \
     } while (0);
 
 /**
@@ -116,13 +98,26 @@ typedef enum {
  * Ordinary errors
  * Print the message and let the program handle it.
  */
-#define oliveError(...)                         \
-    do {                                        \
-        fprintf(stderr, "Error: ");             \
-        fprintf(stderr, __VA_ARGS__);           \
-        fprintf(stderr, "\n");                  \
-        fflush(stdout);                         \
+#define oliveError(...)                                     \
+    do {                                                    \
+        fprintf(stderr, "[ERROR] ");                        \
+        fprintf(stderr, __VA_ARGS__);                       \
+        fprintf(stderr, ": %s (%d)", __FILE__, __LINE__);   \
+        fprintf(stderr, "\n");                              \
+        fflush(stdout);                                     \
     } while (0);
 
+/**
+ * Cuda Runtime errors
+ * Convert a cuda error to a string and print it 
+ */
+#define oliveCudaError(err)                                 \
+    do {                                                    \
+        fprintf(stderr, "[CUERR] ");                        \
+        fprintf(stderr, cudaGetErrorString(err));           \
+        fprintf(stderr, ": %s (%d)", __FILE__, __LINE__);   \
+        fprintf(stderr, "\n");                              \
+        fflush(stdout);                                     \
+    } while (0);
 
-#endif
+#endif  // OLIVE_DEF
