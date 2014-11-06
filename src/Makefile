@@ -25,6 +25,7 @@ OLIVE_DIR = $(PROJECT_ROOT)/src/olive
 IMPL_DIR = $(OLIVE_DIR)/impl
 TEST_DIR = $(PROJECT_ROOT)/src/test
 BUILD_DIR = $(PROJECT_ROOT)/build
+UNITEST_DIR = $(PROJECT_ROOT)/src/unitest
 OBJ_DIR = $(BUILD_DIR)/obj
 BIN_DIR = $(BUILD_DIR)/bin
 LIB_DIR = $(BUILD_DIR)/lib
@@ -35,8 +36,8 @@ LIB_DIR = $(BUILD_DIR)/lib
 #-------------------------------------------------------------------------------
 CC = gcc
 CXX = g++
-NVCCFLAGS = -O3
-CCFLAGS = -Wall -O3
+NVCCFLAGS = -g
+CCFLAGS = -Wall -g -gdwarf-3 -std=c++11
 
 
 #-------------------------------------------------------------------------------
@@ -101,8 +102,6 @@ DEPS    = $(wildcard $(OLIVE_DIR)/*.h)
 #-------------------------------------------------------------------------------
 # Fake Targets
 #-------------------------------------------------------------------------------
-all: libs
-
 .PHONY: clean clean-bin clean-all objects bfs
 
 
@@ -134,6 +133,15 @@ bfs: $(BIN_DIR) $(BIN_DIR)/test_bfs
 $(BIN_DIR)/test_bfs: $(TEST_DIR)/test_bfs.cu libs
 	@echo "Building executable: "$@	
 	@$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) $(LIB_DIR)/libolive.a
+
+#-------------------------------------------------------------------------------
+# Rules for unitest
+#-------------------------------------------------------------------------------
+unitest_bitmap: $(BIN_DIR) $(BIN_DIR)/unitest_bitmap
+
+$(BIN_DIR)/unitest_bitmap: $(UNITEST_DIR)/unitest_bitmap.c 
+	@echo "Building unitest: "$@	
+	@$(CXX) -o $@ $< $(CCFLAGS) $(INC)
 
 
 #-------------------------------------------------------------------------------
