@@ -11,7 +11,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <stdio.h>
 
 /** A word contains 64 bits */
 typedef uint64_t Word;
@@ -42,7 +42,7 @@ class Bitmap {
      */
     explicit Bitmap(int numBits) {
         numWords = ((numBits - 1) >> 6) + 1;  // Div by 64 conservatively
-        words = new Word[numWords];
+        words = new Word[numWords]();
     }
 
     /** Get the capacity (number of bits) contained in this bitmap */
@@ -56,12 +56,13 @@ class Bitmap {
     * @param index the bit index
     */
     void set(int index) {
-        Word bitmask = 1 << (index & 0x3f);     // Mod 64 and shift
+        Word bitmask = (Word)1 << (index & 0x3f);     // Mod 64 and shift
         words[index >> 6] |= bitmask;           // Div by 64 and mask
+        //printf("words[%d] = %lld, index = %d, bitmask = %llu\n",index>>6, words[index >> 6], index, bitmask);
     }
 
     void unset(int index) {
-        Word bitmask = 1 << (index & 0x3f);     // Mod 64 and shift
+        Word bitmask =(Word) 1 << (index & 0x3f);     // Mod 64 and shift
         words[index >> 6] &= ~bitmask;          // Div by 64 and mask
     }
 
@@ -72,7 +73,7 @@ class Bitmap {
     * @return      True if the bit is currently set
     */
     bool get(int index) const {
-        Word bitmask = 1 << (index & 0x3f);
+        Word bitmask =(Word) 1 << (index & 0x3f);
         return (words[index >> 6] & bitmask) != 0;
     }
 
