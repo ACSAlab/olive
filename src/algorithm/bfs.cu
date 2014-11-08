@@ -7,9 +7,8 @@
  */
 
 // olive includes
-#include "GraphH.h"
-#include "GraphD.h"
-#include "util.h"
+
+#include "GraphLoader.h"
 
 #include <stdio.h>
 
@@ -19,15 +18,10 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    printf("device count: %d\n", getGpuNum());
-    checkAvailableMemory();
+    Graph g = GraphLoader::fromEdgeListFile(argv[1]);
 
-    GraphH graphH;
-    graphH.fromFile(argv[1]);
-    graphH.print();
 
-    GraphD graphD;
-    graphD.fromGraphH(graphH);
+    g.
 
 
     return 0;

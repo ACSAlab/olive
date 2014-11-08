@@ -8,7 +8,8 @@
  * Last Modified: 2014-11-04
  */
 
-#pragma once
+#ifndef MEMORY_H
+#define MEMORY_H
 
 #include "Defines.h"
 #include "util/Logging.h"
@@ -20,17 +21,6 @@
  */
 class Memory : public Logging {
  public:
-    /** Different levels of memory location  */
-    typedef enum {
-        CPU_ONLY = 0,   // Normal C allocations
-        PINNED,         // Zero-copy memory
-        MAPPED,         // Allocate on host side and maps the allocation into
-                        // CUDA address space. The device pointer to the memory
-                        // is obtained by calling cudaHostGetDevicePointer().
-        MANAGED,        // Unified memory supported in CUDA 6.0
-        GPU_ONLY,       // Normal CUDA allocations
-    } MemoryLevel;
-
     /**
      * Allocate a memory buffer at a specified `memoryLevel`.
      * 
@@ -205,3 +195,5 @@ class Memory : public Logging {
             return FAILURE;
     }
 };
+
+#endif  // MEMORY_H

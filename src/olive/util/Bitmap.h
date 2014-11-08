@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include <cinttypes>
-#include <cstdlib>
-#include <cstring>
+#include <inttypes.h>
+#include <stdlib.h>
+#include <string.h>
 
 
 /** A word contains 64 bits */
