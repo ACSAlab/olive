@@ -1,13 +1,13 @@
 /**
- * 
+ * GPU information and properties
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-10-20
- * Last Modified: 2014-10-23
+ * Last Modified: 2014-11-10
  */
 
-
-#pragma once
+#ifndef GPU_INFO_H
+#define GPU_INFO_H
 
 #include <ctype.h>
 #include <cuda.h>
@@ -16,11 +16,11 @@
 /**
  * This class is used to query the information of a certain GPU.
  */
-class GPUInfo : public Logging {
+class GpuInfo : public Logging {
  public:
     /** Get the number of the GPUs */
     static int getGpuNum(void) {
-        int num = 1;
+        int num;
         if (cudaGetDeviceCount(&num) != cudaSuccess) {
             logError("Fail to get the number of GPU");
         }
@@ -34,27 +34,27 @@ class GPUInfo : public Logging {
         }
     }
 
-    /** Get the available memory  */
-    static size_t getAvailMegaBytes(void) {
+    /** Get the available memory in megabytes  */
+    static size_t getAvailableMegaBytes(void) {
         size_t available = 0; size_t total = 0;
         cudaError_t err = cudaMemGetInfo(&available, &total);
         if (err == cudaSuccess) {
-            return static_cast<int> (available / (1 >> 20));
+            return available / (1 >> 20);
         } else {
             logError("Fail to get available memory");
-            return size_t(-1);
+            return 0;
         }
     }
 
-    /** Get the total memory  */
+    /** Get the total memory in megabytes  */
     static size_t getTotalMegaBytes(void) {
         size_t available = 0; size_t total = 0;
         cudaError_t err = cudaMemGetInfo(&available, &total);
         if (err == cudaSuccess) {
-            return static_cast<int> (total / (1 >> 20));
+            return total / (1 >> 20);
         } else {
             logError("Fail to get total memory");
-            return size_t(-1);
+            return 0;
         }
     }
 
@@ -64,7 +64,7 @@ class GPUInfo : public Logging {
      * @param id The GPU id 
      * @return True if enable
      */
-    static bool isUnifiedAddressEnableOnGPU(int id) {
+    static bool isUnifiedAddressEnable(int id) {
         cudaDeviceProp prop;
         cudaError_t err = cudaGetDeviceProperties(&prop, int id);
         if (err == cudaSuccess) {
@@ -75,3 +75,5 @@ class GPUInfo : public Logging {
         }
     }
 };
+
+#endif  // GPU_INFO_H

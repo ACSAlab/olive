@@ -39,4 +39,6 @@ typedef enum {
     GPU_ONLY,       // Normal CUDA allocations
 } MemoryLevel;
 
+
+
 #endif  // DEFINES_H
