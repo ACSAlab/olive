@@ -42,28 +42,6 @@ class Memory : public Logging {
             }
             break;
 
-        case PINNED:
-            err = cudaMallocHost(ptr, size, cudaHostAllocPortable);
-            if (err != cudaSuccess) {
-                logError("CUDA: %s", cudaGetErrorString(err));
-                return FAILURE;
-            }
-            break;
-
-        case MAPPED:
-            // `cudaHostAllocWriteCombined` memory can be transferred across
-            // the PCI Express bus more quickly on some system configurations,
-            // but cannot be read efficiently by most CPUs.
-            // So it is a good option for host->device transfers.
-            err = cudaMallocHost(ptr, size, cudaHostAllocWriteCombined |
-                                 cudaHostAllocMapped | cudaHostAllocPortable);
-
-            if (err != cudaSuccess) {
-                logError("CUDA: %s", cudaGetErrorString(err));
-                return FAILURE;
-            }
-            break;
-
         case MANAGED:
             err = cudaMallocManaged(ptr, size);
             if (err != cudaSuccess) {
@@ -102,8 +80,6 @@ class Memory : public Logging {
         cudaError_t err;
         switch (memoryLevel) {
         case CPU_ONLY:
-        case PINNED:
-        case MAPPED:
             memset(* ptr, value, size);
             break;
 
@@ -137,15 +113,6 @@ class Memory : public Logging {
             free(ptr);
             break;
 
-        case PINNED:
-        case MAPPED:
-            err = cudaFreeHost(ptr);
-            if (err != cudaSuccess) {
-                logError("CUDA: %s", cudaGetErrorString(err));
-                return FAILURE;
-            }
-            break;
-
         case MANAGED:
         case GPU_ONLY:
             err = cudaFree(ptr);
@@ -163,10 +130,9 @@ class Memory : public Logging {
     }
 
     /**
-     * Wraps the cudaMemcpy function using Peer-to-Peer copy.
+     * Wraps the cudaMemcpy() function using Peer-to-Peer copy.
      * 
-     * @note Must be carried out on a platform supporting Uinified Virtual
-     * Addressing (UVA).
+     * @note Must be carried out on a platform supporting unified memory.
      * 
      * @param  dst   Points to the device buffer
      * @param  src   Points to the host buffer
@@ -175,21 +141,6 @@ class Memory : public Logging {
      */
     static inline Error memcpy(void * dst, const void * src, size_t size) {
         if (cudaMemcpy(dst, src, size, cudaMemcpyDefault)== cudaSuccess)
-            return SUCCESS;
-        else
-            return FAILURE;
-    }
-
-    /**
-     * Wraps the cudaHostGetDevicePointer() function, which is used to fetch the
-     * device pointer for the host-mapped buffer
-     * 
-     * @param  deviceP  Points to the device buffer
-     * @param  hostP    Points to the host-mapped buffer
-     * @return          SUCCESS if fetched, FAILURE otherwise
-     */
-    static inline getDevicePointer(void ** pDevice, void * pHost) {
-        if (cudaHostGetDevicePointer(pDevice, pHost, 0) == cudaSuccess)
             return SUCCESS;
         else
             return FAILURE;

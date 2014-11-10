@@ -6,11 +6,13 @@
  * Last Modified: 2014-11-05
  */
 
+#ifndef LOGGING_H
+#define LOGGING_H
 
 #include <stdio.h>
 
 /**
- * Any class requires logging can inheritate this class 
+ * Any class requires logging can inherit this class 
  */
 class Logging {
  private:
@@ -18,11 +20,10 @@ class Logging {
 
  public:
     /**
-     * Change the logging redirection. By default, the log content is printed on
-     * the screen.
-     * @param file log file
+     * Change the logging redirection.
+     * @param file New log file
      */
-    void log(FILE * file) {
+    void setLogFile(FILE * file) {
         logFile = file
     }
 
@@ -56,9 +57,10 @@ class Logging {
         fflush(logFile);
     }
 
+    /** By default, logs are outputed to stdout */
     Loggging() : logFile(stdout) {}
-}
+};
 
-
+#endif  // LOGGING_H
 
 

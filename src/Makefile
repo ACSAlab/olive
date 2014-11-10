@@ -11,8 +11,7 @@
 #-------------------------------------------------------------------------------
 # Compiler switches
 #-------------------------------------------------------------------------------
-force_cuda5 = 1
-force64 = 1
+force_x64 = 1
 force_sm35 = 0
 disable_l1_cache = 0
 
@@ -36,18 +35,10 @@ LIB_DIR = $(BUILD_DIR)/lib
 #-------------------------------------------------------------------------------
 CC = gcc
 CXX = g++
+NVCC = "$(shell which nvcc)"
 NVCCFLAGS = -g
 CCFLAGS = -Wall -g -gdwarf-3 -std=c++11
 
-
-#-------------------------------------------------------------------------------
-# NVCC version
-#-------------------------------------------------------------------------------
-ifneq ($(force_cuda5), 1)
-	NVCC = "$(shell which nvcc)"
-else
-	NVCC = /usr/local/cuda-5.5/bin/nvcc
-endif
 
 
 #-------------------------------------------------------------------------------
@@ -76,7 +67,7 @@ endif
 #-------------------------------------------------------------------------------
 # 64 or 32 bit (compile with 32-bit device pointers by default)
 #-------------------------------------------------------------------------------
-ifneq ($(force64), 1)
+ifneq ($(force_x64), 1)
 	NVCCFLAGS += -m32
 	CCFLAGS += -m32
 else
@@ -133,6 +124,7 @@ bfs: $(BIN_DIR) $(BIN_DIR)/test_bfs
 $(BIN_DIR)/test_bfs: $(TEST_DIR)/test_bfs.cu libs
 	@echo "Building executable: "$@	
 	@$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) $(LIB_DIR)/libolive.a
+
 
 #-------------------------------------------------------------------------------
 # Rules for unitest

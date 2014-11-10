@@ -6,7 +6,8 @@
  * Last Modified: 2014-11-05
  */
 
-#pragma once
+#ifndef BITMAP_H
+#define BITMAP_H
 
 #include <inttypes.h>
 #include <stdlib.h>
@@ -164,3 +165,4 @@ class Bitmap {
     }
 };
 
+#endif  // BITMAP_H
