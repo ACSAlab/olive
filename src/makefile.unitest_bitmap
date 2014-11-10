@@ -1,0 +1,17 @@
+CXX = g++
+CCFLAGS = -g
+INC = -I$(OLIVE_DIR)
+
+PROJECT_ROOT = ..
+BUILD_DIR = $(PROJECT_ROOT)/build
+OLIVE_DIR = $(PROJECT_ROOT)/src/olive
+UNITEST_DIR = $(PROJECT_ROOT)/src/unitest
+BIN_DIR = $(BUILD_DIR)/bin
+
+all: unitest_bitmap
+
+unitest_bitmap: $(BIN_DIR) $(BIN_DIR)/unitest_bitmap
+
+$(BIN_DIR)/unitest_bitmap: $(UNITEST_DIR)/unitest_bitmap.c 
+	@echo "Building unitest: "$@	
+	@$(CXX) -o $@ $< $(CCFLAGS) $(INC)
