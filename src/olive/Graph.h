@@ -20,8 +20,7 @@
  * @tparam VD the vertex attribute type
  * @tparam ED the edge attribute type
  */
-template<VD, ED>
-class Graph: public Graph {
+template <typename VD, typename ED> class Graph: public Graph {
  public:
     /**
      * An RDD containing the vertices and their associated attributes.

@@ -9,6 +9,7 @@
 #ifndef DEFINES_H
 #define DEFINES_H
 
+#include "common.h"
 
 /** One word equals 64 bit. */
 typedef uint64_t Word;
