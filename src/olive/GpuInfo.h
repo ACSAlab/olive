@@ -66,7 +66,7 @@ class GpuInfo : public Logging {
      */
     static bool isUnifiedAddressEnable(int id) {
         cudaDeviceProp prop;
-        cudaError_t err = cudaGetDeviceProperties(&prop, int id);
+        cudaError_t err = cudaGetDeviceProperties(&prop, id);
         if (err == cudaSuccess) {
             return prop.unifiedAddressing;
         } else {

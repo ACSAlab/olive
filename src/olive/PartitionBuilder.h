@@ -11,7 +11,7 @@
 #define PARTITION_BUILDER_H
 
 #include <vector>
-#include "Define.h"
+#include "Defines.h"
 #include "EdgeTuple.h"
 #include "PartitionStrategy.h"
 
@@ -20,8 +20,7 @@
  * 
  * @tparam ED type of the edge attribute
  */
-template<ED>
-class PartitionBuilder {
+template <typename ED> class PartitionBuilder {
  private:
     std::vector<Edge> * edgeTuples;
 
