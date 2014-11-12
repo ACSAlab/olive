@@ -9,39 +9,39 @@
 #ifndef LOGGING_H
 #define LOGGING_H
 
-#include <stdio.h>
+#include "common.h"
 
 /**
  * Any class requires logging can inherit this class 
  */
 class Logging {
  private:
-    FILE * logFile;
+	 static FILE * logFile;
 
  public:
     /**
      * Change the logging redirection.
      * @param file New log file
      */
-    void setLogFile(FILE * file) {
-        logFile = file
+	 static void setLogFile(FILE * file) {
+		logFile = file;
     }
 
-    void logInfo(...) {
+    static void logInfo(...) {
         fprintf(logFile, "[Info] ");
         fprintf(logFile, __VA_ARGS__);
         fprintf(logFile, "\n");
         fflush(logFile);
     }
 
-    void logWarning(...) {
+	static void logWarning(...) {
         fprintf(logFile, "[Warning] ");
         fprintf(logFile, __VA_ARGS__);
         fprintf(logFile, "\n");
         fflush(logFile);
     }
 
-    void logDebug(...) {
+	static void logDebug(...) {
         fprintf(logFile, "[Debug] ");
         fprintf(logFile, __VA_ARGS__);
         fprintf(logFile, ": %s (%d)", __FILE__, __LINE__);
@@ -49,7 +49,7 @@ class Logging {
         fflush(logFile);
     }
 
-    void logError(...) {
+	static void logError(...) {
         fprintf(logFile, "[Error] ");
         fprintf(logFile, __VA_ARGS__);
         fprintf(logFile, ": %s (%d)", __FILE__, __LINE__);
@@ -58,7 +58,6 @@ class Logging {
     }
 
     /** By default, logs are outputed to stdout */
-    Loggging() : logFile(stdout) {}
 };
 
 #endif  // LOGGING_H

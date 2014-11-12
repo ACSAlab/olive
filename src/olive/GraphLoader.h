@@ -12,8 +12,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <vector>
-#include "util/Logging.h"
-#include "util/Utils.h"
+#include "Logging.h"
+#include "Utils.h"
 #include "Graph.h"
 #include "PartitionBuilder.h"
 
@@ -44,8 +44,8 @@ class GraphLoader: public Logging {
      */
     static Graph<int, int> & fromEdgeListFile(
         char * path,
-        MemoryLevel vertexMemoryLevel = HOST_ONLY,
-        MemoryLevel edgeMemoryLevel = HOST_ONLY)
+        MemoryLevel vertexMemoryLevel = CPU_ONLY,
+		MemoryLevel edgeMemoryLevel = CPU_ONLY)
     {
         FILE * fileHandler = fopen(path, "r");
         if (fileHandler == NULL) {
@@ -59,7 +59,7 @@ class GraphLoader: public Logging {
         char * remainder;               // Points to the remainder line
         const char delims[] = " \t";    // Delimiters to separate tokens
         std::vector<char *> lineVec;
-        PartitionBuilder<, int> builder;
+        PartitionBuilder<int> builder;
 
         double startTime = util::currentTimeMillis();
 

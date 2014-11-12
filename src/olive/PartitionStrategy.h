@@ -11,7 +11,7 @@
 #define PARTITION_STRATEGY_H
 
 #include "Defines.h"
-#include "util/Utils.h"
+#include "Utils.h"
 /** 
  * An abstract interface for partitioning edges which is based on the 
  * vertexId of each vertex.

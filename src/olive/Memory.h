@@ -11,15 +11,16 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
+#include "common.h"
 #include "Defines.h"
-#include "util/Logging.h"
+#include "Logging.h"
 
 
 /**
  * Wraps around the cuda memory API and provides a unified interface on
  * different `MemoryLevel`.
  */
-class Memory : public Logging {
+class Memory {
  public:
     /**
      * Allocate a memory buffer at a specified `memoryLevel`.
@@ -35,9 +36,9 @@ class Memory : public Logging {
         cudaError_t err;
         switch (memoryLevel) {
         case CPU_ONLY:
-            *ptr = malloc(size);
+            *ptr = ::malloc(size);
             if (*ptr == NULL) {
-                logError("Malloc fail");
+                Logging::logError("Malloc fail");
                 return FAILURE;
             }
             break;
@@ -45,21 +46,21 @@ class Memory : public Logging {
         case MANAGED:
             err = cudaMallocManaged(ptr, size);
             if (err != cudaSuccess) {
-                logError("CUDA: %s", cudaGetErrorString(err));
+				Logging::logError("CUDA: %s", cudaGetErrorString(err));
                 return FAILURE;
             }
             break;
 
         case GPU_ONLY:
-            err = cudaMalloc(ptr, size));
+            err = cudaMalloc(ptr, size);
             if (err != cudaSuccess) {
-                logError("CUDA: %s", cudaGetErrorString(err));
+				Logging::logError("CUDA: %s", cudaGetErrorString(err));
                 return FAILURE;
             }
             break;
 
         default:
-            logError("invalid memory operaion type");
+			Logging::logError("invalid memory operaion type");
             return FAILURE;
         }
         return SUCCESS;
@@ -80,20 +81,20 @@ class Memory : public Logging {
         cudaError_t err;
         switch (memoryLevel) {
         case CPU_ONLY:
-            memset(* ptr, value, size);
+            ::memset(*ptr, value, size);
             break;
 
         case MANAGED:
         case GPU_ONLY:
-            err = cudaMemset(* ptr, value, size));
-            if ((err != cudaSuccess) {
-                logError("CUDA: %s", cudaGetErrorString(err));
+            err = cudaMemset(* ptr, value, size);
+            if ((err != cudaSuccess)) {
+				Logging::logError("CUDA: %s", cudaGetErrorString(err));
                 return FAILURE;
             }
             break;
 
         default:
-            logError("Invalid memory operaion type");
+			Logging::logError("Invalid memory operaion type");
             return FAILURE;
         }
         return SUCCESS;
@@ -117,13 +118,13 @@ class Memory : public Logging {
         case GPU_ONLY:
             err = cudaFree(ptr);
             if (err != cudaSuccess) {
-                logError("CUDA: %s", cudaGetErrorString(err));
+				Logging::logError("CUDA: %s", cudaGetErrorString(err));
                 return FAILURE;
             }
             break;
 
         default:
-            logError("Invalid memory operaion type");
+			Logging::logError("Invalid memory operaion type");
             return FAILURE;
         }
         return SUCCESS;

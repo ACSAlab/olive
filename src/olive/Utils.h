@@ -9,9 +9,9 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include <time.h>
-#include <ctype.h>
-#include <string.h>
+#include "common.h"
+
+#include <sys/time.h>
 
 namespace util {
 
