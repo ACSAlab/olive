@@ -36,13 +36,13 @@ class Bitmap {
     }
 
     /**
-     * Allocate a bitmap on the heap. Note that the inital values are not zero.
+     * Allocate a bitmap on the heap.
      * 
      * @param numBits number of bits in the bitmap
      */
     explicit Bitmap(int numBits) {
         numWords = ((numBits - 1) >> 6) + 1;  // Div by 64 conservatively
-        words = new Word[numWords]();
+        words = new Word[numWords]();         // Initalize with zeros
     }
 
     /** Get the capacity (number of bits) contained in this bitmap */
