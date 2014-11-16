@@ -20,25 +20,23 @@ disable_l1_cache = 0
 # Directories
 #-------------------------------------------------------------------------------
 PROJECT_ROOT = ..
-OLIVE_DIR = $(PROJECT_ROOT)/src/olive
-IMPL_DIR = $(OLIVE_DIR)/impl
-TEST_DIR = $(PROJECT_ROOT)/src/test
-BUILD_DIR = $(PROJECT_ROOT)/build
-UNITEST_DIR = $(PROJECT_ROOT)/src/unitest
-OBJ_DIR = $(BUILD_DIR)/obj
-BIN_DIR = $(BUILD_DIR)/bin
-LIB_DIR = $(BUILD_DIR)/lib
+SRC_DIR      = $(PROJECT_ROOT)/src
+OLIVE_DIR    = $(SRC_DIR)/olive
+UTEST_DIR    = $(SRC_DIR)/unitest
+ALGO_DIR     = $(SRC_DIR)/algorithm
+BUILD_DIR    = $(PROJECT_ROOT)/build
+OBJ_DIR      = $(BUILD_DIR)/obj
+BIN_DIR      = $(BUILD_DIR)/bin
+LIB_DIR      = $(BUILD_DIR)/lib
 
 
 #-------------------------------------------------------------------------------
 # Compliers and flags
 #-------------------------------------------------------------------------------
-CC = gcc
-CXX = g++
+CC = g++
 NVCC = "$(shell which nvcc)"
 NVCCFLAGS = -g
 CCFLAGS = -Wall -g -gdwarf-3 -std=c++11
-
 
 
 #-------------------------------------------------------------------------------
@@ -85,23 +83,27 @@ INC = -I$(OLIVE_DIR)
 #-------------------------------------------------------------------------------
 # Generates the name lists for building
 #-------------------------------------------------------------------------------
-CUSRC   = $(wildcard $(IMPL_DIR)/*.cu)  
-CUOBJS  = $(patsubst $(IMPL_DIR)/%.cu, $(OBJ_DIR)/%.cu.o, $(CUSRC)) 
-DEPS    = $(wildcard $(OLIVE_DIR)/*.h)
+CUSRC  = $(wildcard $(OLIVE_DIR)/*.cu)
+CUOBJ  = $(patsubst $(OLIVE_DIR)/%.cu, $(OBJ_DIR)/%.cu.o, $(CUSRC))
+CCSRC  = $(wildcard $(OLIVE_DIR)/*.cc)
+CUOBJ  = $(patsubst $(OLIVE_DIR)/%.cc, $(OBJ_DIR)/%.cc.o, $(CCSRC))
+UTSRC  = $(wildcard $(UTEST_DIR)/*.cc)
+UTEXE  = $(patsubst $(UTEST_DIR)/%.cc, $(BIN_DIR)/%, $(UTSRC))
+DEPS   = $(wildcard $(OLIVE_DIR)/*.h)
 
 
 #-------------------------------------------------------------------------------
 # Fake Targets
 #-------------------------------------------------------------------------------
-.PHONY: clean clean-bin clean-all objects bfs
+.PHONY: clean clean-bin clean-all libolive objects
+
+all: 
 
 
 #-------------------------------------------------------------------------------
-# Archive all the objects into a static library
+# Archive olive static library
 #-------------------------------------------------------------------------------
-libs: $(LIB_DIR)/libolive.a
-
-$(LIB_DIR)/libolive.a: $(LIB_DIR) objects
+libolive: $(LIB_DIR) objects
 	@echo "Creating library: " $@
 	@ar -r -u $@ $(CUOBJS)
 
@@ -109,31 +111,36 @@ $(LIB_DIR)/libolive.a: $(LIB_DIR) objects
 #-------------------------------------------------------------------------------
 # Target/common rule for building olive codes
 #-------------------------------------------------------------------------------
-objects: $(OBJ_DIR) $(CUOBJS)
+objects: $(OBJ_DIR) $(CUOBJ) $(CCOBJ)
 
-$(OBJ_DIR)/%.cu.o:  $(IMPL_DIR)/%.cu $(DEPS)
+$(CUOBJ): $(OBJ_DIR)/%.cu.o: $(OLIVE_DIR)/%.cu $(DEPS)
 	@echo "Creating cuda object: "$@
 	@$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) -c
+
+$(CCOBJ): $(OBJ_DIR)/%.cc.o: $(OLIVE_DIR)/%.cc $(DEPS)
+	@echo "Creating cpp object: "$@
+	@$(CC) -o $@ $< $(CCFLAGS) $(INC) -c
+
+
+#-------------------------------------------------------------------------------
+# Rules for unitest (unitest/%.cc => bin/%)
+#-------------------------------------------------------------------------------
+unitests: $(BIN_DIR) $(UTEXE) 
+
+$(UTEXE): $(BIN_DIR)/%: $(UTEST_DIR)/%.cc $(DEPS) 
+	@echo "Building unitest executable: "$@	
+	@$(CC) -o $@ $< $(CCFLAGS) $(INC)
 
 
 #-------------------------------------------------------------------------------
 # Rules for BFS
 #-------------------------------------------------------------------------------
-bfs: $(BIN_DIR) $(BIN_DIR)/test_bfs
+#bfs: $(BIN_DIR) $(BIN_DIR)/test_bfs
 
-$(BIN_DIR)/test_bfs: $(TEST_DIR)/test_bfs.cu libs
-	@echo "Building executable: "$@	
-	@$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) $(LIB_DIR)/libolive.a
+#$(BIN_DIR)/test_bfs: $(TEST_DIR)/test_bfs.cu libs
+#	@echo "Building executable: "$@	
+#	@$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) $(LIB_DIR)/libolive.a
 
-
-#-------------------------------------------------------------------------------
-# Rules for unitest
-#-------------------------------------------------------------------------------
-unitest_bitmap: $(BIN_DIR) $(BIN_DIR)/unitest_bitmap
-
-$(BIN_DIR)/unitest_bitmap: $(UNITEST_DIR)/unitest_bitmap.c 
-	@echo "Building unitest: "$@	
-	@$(CXX) -o $@ $< $(CCFLAGS) $(INC)
 
 
 #-------------------------------------------------------------------------------

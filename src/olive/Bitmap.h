@@ -9,17 +9,10 @@
 #ifndef BITMAP_H
 #define BITMAP_H
 
-#include <inttypes.h>
-#include <stdlib.h>
-#include <string.h>
+#include <algorithm>
 
-/** A word contains 64 bits */
-typedef uint64_t Word;
-
-
-#define MAX(a, b) ((a > b) ? a : b)
-#define MIN(a, b) ((a < b) ? a : b)
-
+#include "common.h"
+#include "utils.h"
 
 /**
  * A simple bitmap implementation. No bound checking so it is fast.
@@ -36,13 +29,17 @@ class Bitmap {
     }
 
     /**
-     * Allocate a bitmap on the heap.
+     * Allocate a bitmap initalize with zeros on the heap.
      * 
      * @param numBits number of bits in the bitmap
      */
-    explicit Bitmap(int numBits) {
-        numWords = ((numBits - 1) >> 6) + 1;  // Div by 64 conservatively
-        words = new Word[numWords]();         // Initalize with zeros
+     explicit Bitmap(int numBits) {
+        numWords = ((numBits - 1) >> 6) + 1;
+        words = new Word[numWords]();
+    }
+
+    ~Bitmap(void) {
+        delete[] words;
     }
 
     /** Get the capacity (number of bits) contained in this bitmap */
@@ -56,23 +53,28 @@ class Bitmap {
     * @param index the bit index
     */
     void set(int index) {
-        Word bitmask = (Word)1 << (index & 0x3f);     // Mod 64 and shift
-        words[index >> 6] |= bitmask;                 // Div by 64 and mask
-    }
-
-    void unset(int index) {
-        Word bitmask = (Word) 1 << (index & 0x3f);     // Mod 64 and shift
-        words[index >> 6] &= ~bitmask;                 // Div by 64 and mask
+        Word bitmask = static_cast<Word>(1) << (index & 0x3f);
+        words[index >> 6] |= bitmask;
     }
 
     /**
-    * Get the bit with the specified index.
-    *
-    * @param index The bit index
-    * @return      True if the bit is currently set
+    * Sets the bit at the specified index to 0.
+    * 
+    * @param index the bit index
     */
+    void unset(int index) {
+        Word bitmask = static_cast<Word>(1) << (index & 0x3f);
+        words[index >> 6] &= ~bitmask;
+    }
+
+    /**
+     * Get the bit with the specified index.
+     *
+     * @param index The bit index
+     * @return      True if the bit is currently set
+     */
     bool get(int index) const {
-        Word bitmask = (Word) 1 << (index & 0x3f);
+        Word bitmask = static_cast<Word>(1) << (index & 0x3f);
         return (words[index >> 6] & bitmask) != 0;
     }
 
@@ -82,12 +84,11 @@ class Bitmap {
      * @param other The other bitmap
      * @return      Result bitmap
      */
-    Bitmap & operator= (const Bitmap & other) {
-        // Copy other to a temp buffer first
+     Bitmap & operator= (const Bitmap & other) {
         Word * temp = new Word[other.numWords];
         memcpy(temp, other.words, other.numWords * sizeof(Word));
         if (words != NULL) {
-            delete[] words;             // Delete the old data
+            delete[] words;
         }
         words = temp;
         numWords = other.numWords;
@@ -100,9 +101,9 @@ class Bitmap {
      * @param other The other bitmap
      * @return      Result bitmap
      */
-    Bitmap operator& (const Bitmap & other) {
-        int numBitsBigger   = MAX(capacity(), other.capacity());
-        int numWordsSmaller = MIN(numWords, other.numWords);
+     Bitmap operator& (const Bitmap & other) {
+        int numBitsBigger   = std::max(capacity(), other.capacity());
+        int numWordsSmaller = std::min(numWords, other.numWords);
         Bitmap newBitmap(numBitsBigger);
         for (int i = 0; i < numWordsSmaller; i++) {
             newBitmap.words[i] = words[i] & other.words[i];
@@ -116,9 +117,9 @@ class Bitmap {
      * @param other The other bitmap
      * @return      Result bitmap
      */
-    Bitmap operator| (const Bitmap & other) {
-        int numBitsBigger   = MAX(capacity(), other.capacity());
-        int numWordsSmaller = MIN(numWords, other.numWords);
+     Bitmap operator| (const Bitmap & other) {
+        int numBitsBigger   = std::max(capacity(), other.capacity());
+        int numWordsSmaller = std::min(numWords, other.numWords);
         Bitmap newBitmap(numBitsBigger);
         for (int i = 0; i < numWordsSmaller; i++) {
             newBitmap.words[i] = words[i] | other.words[i];
@@ -139,9 +140,9 @@ class Bitmap {
      * @param other The other bitmap
      * @return      Result bitmap
      */
-    Bitmap operator^ (const Bitmap &other) {
-        int numBitsBigger   = MAX(capacity(), other.capacity());
-        int numWordsSmaller = MIN(numWords, other.numWords);
+     Bitmap operator^ (const Bitmap &other) {
+        int numBitsBigger   = std::max(capacity(), other.capacity());
+        int numWordsSmaller = std::min(numWords, other.numWords);
         Bitmap newBitmap(numBitsBigger);
         for (int i = 0; i < numWordsSmaller; i++) {
             newBitmap.words[i] = words[i] ^ other.words[i];
@@ -154,12 +155,6 @@ class Bitmap {
             newBitmap.words[i] = other.words[i];
         }
         return newBitmap;
-    }
-
-    ~Bitmap(void) {
-        delete[] words;
-        words = NULL;
-        numWords = 0;
     }
 };
 
