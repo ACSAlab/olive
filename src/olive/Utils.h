@@ -9,9 +9,10 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include "common.h"
 
 #include <sys/time.h>
+
+#include "common.h"
 
 namespace util {
 
@@ -39,7 +40,7 @@ bool isNumeric(const char * str) {
  */
 size_t hashCode(size_t a) {
       a ^= (a << 13);
-      a ^= (a >>> 17);
+      a ^= (a >> 17);
       a ^= (a << 5);
       return a;
 }
