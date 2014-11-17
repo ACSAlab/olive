@@ -15,6 +15,7 @@
 
 #include "common.h"
 #include "edge_tuple.h"
+#include "partition_strategy.h"
 #include "logging.h"
 #include "utils.h"
 
@@ -51,6 +52,9 @@ class Edge {
  * Edge structure for flexible graph reprenstation. Each vertex contains
  * an `id`, all its outgoing edges, all its ingoing edges, and an arbitrary
  * attribtue.
+ *
+ * @note Storing the outgoing edges for each vertex is sufficient to represent
+ * the graph. `inEdges` is just for analyzing the topology of the graph.
  *
  * @tparam VD the vertex attribute type
  * @tparam ED the edge attribute type
@@ -164,7 +168,7 @@ class Graph {
     }
 
     /**
-     * Prints the outdegree distribution on the screen.
+     * Prints the outdegree distribution in log-style on the screen.
      * e.g., the output will look:
      * {{{
      * outDegreeLog[0]: 0         5%
@@ -267,6 +271,26 @@ class Graph {
     }
 
     /**
+     * Partioning a graph to subgraphs by a specified `partitionStrategy`.
+     *
+     * The only thing between a subgraph and a complete graph is that
+     * the destination of an edge in a subgraph may not exist in the same
+     * graph.
+     *
+     * @param partitionStrategy Decides which patition an vertice belongs to.
+     * @param numParts          Number of patitions
+     * @return                  A vector of subgraphs
+     */
+    std::vector<Graph<VD, ED>> partitionBy(PartitionStrategy &partitionStrategy, PartitionId numParts) {
+        std::vector<Graph<VD, ED>> subgraphs = std::vector<Graph<VD, ED>>(numParts);
+        for (auto v : vertices) {
+            PartitionId partitionId = partitionStrategy.getPartition(v.id, numParts);
+            subgraphs[partitionId].vertices.push_back(v);
+        }
+        return subgraphs;
+    }
+
+    /**
      * Print the graph on the screen as the outgoing edges
      */
     void printScatter(bool withAttr = false) {
@@ -333,4 +357,4 @@ class Graph {
 
 }  // namespace flex
 
-#endif  // FLEXIBLE_GRAPH_H
+#endif  // FLEXIBLE_H

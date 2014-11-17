@@ -13,24 +13,28 @@
 #include "common.h"
 #include "utils.h"
 
-
 /** 
- * An abstract interface for partitioning vertices.
+ * An abstract interface for partitioning vertices for flexible graph 
+ * representation. 
+ * 
+ * TODO(onesuper): Paritioning according to the topology of graph.
+ * A partition strategy may possibly consider some of the 
+ * graph attributes, e.g. outdegree, etc.
  */
 class PartitionStrategy {
  public:
     /** 
      * Returns the partition number for a given vertex.
-     * @param  vid       Source vertex of the edge
+     * @param  id        Id for the vertex in graph
      * @param  numParts  Number of parts to partition
      * @return           The partition number for a given vertex
      */
-    virtual PartitionId getPartition(VertexId vid, PartitionId numParts) = 0;
+    virtual PartitionId getPartition(VertexId id, PartitionId numParts) const = 0;
 };
 
 class RandomEdgeCut: public PartitionStrategy {
-    PartitionId getPartition(VertexId vid, PartitionId numParts) {
-        return util::hashCode(vid) % numParts;
+    PartitionId getPartition(VertexId id, PartitionId numParts) const {
+        return util::hashCode(id) % numParts;
     }
 };
 

@@ -45,7 +45,7 @@ class GRD {
         return elemsDevice[index];
     }
 
-    /** Write the dataset from GPU's onboard memory to host memory */
+    /** Write-back the dataset from GPU's onboard memory to host memory */
     void persist(void) {
         CUDA_CHECK(cudaMemcpy(elemsDevice, elemsHost,
                               size * sizeof(T), cudaMemcpyDefault));
