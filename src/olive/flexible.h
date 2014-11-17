@@ -165,7 +165,7 @@ class Graph {
 
     /**
      * Prints the outdegree distribution on the screen.
-     * e.g., the output will look like:
+     * e.g., the output will look:
      * {{{
      * outDegreeLog[0]: 0         5%
      * outDegreeLog[1]: (1, 2]   15%
@@ -175,29 +175,29 @@ class Graph {
      */
      void printDegreeDist(void) {
         size_t outDegreeLog[32];
-        size_t outDegreeMax = -1;
+        int slotMax = 0;
         for (int i = 0; i < 32; i++) {
             outDegreeLog[i] = 0;
         }
         for (auto v : vertices) {
             size_t outdegree = v.outdegree();
-            int times = 0;
+            int slot = 0;
             while (outdegree > 0) {
                 outdegree /= 2;
-                times++;
+                slot++;
             }
-            if (times > outDegreeMax) {
-                outDegreeMax = times;
+            if (slot > slotMax) {
+                slotMax = slot;
             }
-            outDegreeLog[times]++;
+            outDegreeLog[slot]++;
         }
-        printf("outDegreeLog[0]: 0\t%lu\t%.2f\n", outDegreeLog[0],
+        printf("outDegreeLog[0]: 0\t%lu\t%.2f%%\n", outDegreeLog[0],
                vertexPercentage(outDegreeLog[0]));
 
-        for (int i = 1; i <= outDegreeMax; i++) {
+        for (int i = 1; i <= slotMax; i++) {
             int high = pow(2, i-1);
             int low  = pow(2, i-2);
-            printf("outDegreeLog[%d]: (%d, %d]\t%lu\t%.2f\n", i, low, high,
+            printf("outDegreeLog[%d]: (%d, %d]\t%lu\t%.2f%%\n", i, low, high,
                    outDegreeLog[i], vertexPercentage(outDegreeLog[i]));
         }
     }

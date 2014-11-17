@@ -62,7 +62,7 @@ int main(int argc, char ** argv) {
     graph.sort();
     graph.printScatter();
 
-    //graph.printDegreeDist();
+    graph.printDegreeDist();
 
 
 
