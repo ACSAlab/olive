@@ -21,16 +21,16 @@ namespace util {
  * @param  str String to check
  * @return     True If the string represents a numeric number
  */
-bool isNumeric(const char * str) {
-  assert(str);
-  while ((* str) != '\0') {
-    if (!isdigit(* str)) {
-        return false;
-    } else {
-        str++;
+ bool isNumeric(const char * str) {
+    assert(str);
+    while ((* str) != '\0') {
+        if (!isdigit(* str)) {
+            return false;
+        } else {
+            str++;
+        }
     }
-  }
-  return true;
+    return true;
 }
 
 /**
@@ -39,10 +39,10 @@ bool isNumeric(const char * str) {
  * @return   The hash code
  */
 size_t hashCode(size_t a) {
-      a ^= (a << 13);
-      a ^= (a >> 17);
-      a ^= (a << 5);
-      return a;
+    a ^= (a << 13);
+    a ^= (a >> 17);
+    a ^= (a << 5);
+    return a;
 }
 
 /** Get current time in milliseconds */
