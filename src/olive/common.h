@@ -20,7 +20,6 @@
 #include <inttypes.h>
 
 
-
 /**
  * A wrapper that asserts the success of cuda calls
  * TODO(onesuper): replace it with a method which throws an exception
@@ -51,25 +50,6 @@ typedef uint32_t EdgeId;
 
 /** Defines the type for the partition identifier. */
 typedef uint32_t PartitionId;
-
-
-/** Generic success and failure */
-typedef enum {
-    SUCCESS = 0,
-    FAILURE,
-} Error;
-
-
-/** Different levels of memory location  */
-typedef enum {
-    CPU_ONLY = 0,   // Normal C allocations
-    PINNED,         // Zero-copy memory
-    MAPPED,         // Allocate on host side and maps the allocation into
-                    // CUDA address space. The device pointer to the memory
-                    // is obtained by calling cudaHostGetDevicePointer().
-    MANAGED,        // Unified memory supported in CUDA 6.0
-    GPU_ONLY,       // Normal CUDA allocations
-} MemoryLevel;
 
 
 

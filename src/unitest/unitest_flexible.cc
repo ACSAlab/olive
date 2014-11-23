@@ -78,7 +78,7 @@ int main(int argc, char ** argv) {
     graph.shuffleVertices();
     graph.shuffleEdges();
 
-    // Tests random parition
+    // Tests random parition after shuffle
     unitest_random_paritition(graph, 4);
 
     return 0;

@@ -3,7 +3,7 @@
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-11-13
- * Last Modified: 2014-11-13
+ * Last Modified: 2014-11-23
  */
 
 #ifndef FLEXIBLE_H
@@ -372,6 +372,7 @@ class Graph {
         std::random_shuffle(vertices.begin(), vertices.end());
     }
 
+    /** Sorts the vertices by id. */
     void sortVerticesById(void) {
         std::stable_sort(vertices.begin(), vertices.end());
     }
@@ -383,7 +384,7 @@ class Graph {
         }
     }
 
-    /** Sorts the edges. */
+    /** Sorts the edges by id. */
     void sortEdgesById(void) {
         for (auto &v : vertices) {
             v.sortOutEdgesById();
