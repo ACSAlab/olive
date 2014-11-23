@@ -13,15 +13,57 @@
 #include <sys/time.h>
 
 #include "common.h"
+#include "logging.h"
 
 namespace util {
+
+
+/**
+ * Enable all-to-all peer access
+ * TODO(onesuper): Temporialy making the following functions a part of utilities.
+ */
+void enableAllPeerAccess(void) {
+    int numGpus = 0;
+    CUDA_CHECK(cudaGetDeviceCount(&numGpus));
+    for (int i = 0; i < numGpus; i++) {
+        for (int j = i+1; j < numGpus; j++) {
+            CUDA_CHECK(cudaSetDevice(i));
+            int canAccess = 0;
+            CUDA_CHECK(cudaDeviceCanAccessPeer(&canAccess, i, j));
+            if (canAccess == 1) {
+                CUDA_CHECK(cudaDeviceEnablePeerAccess(j, 0));
+                LOG(INFO) << i << " enable peer access " << j;
+            } else {
+                LOG(WARNING) << i << " cannot access peer " << j;
+            }
+        }
+    }
+}
+
+void disableAllPeerAccess(void) {
+    int numGpus = 0;
+    CUDA_CHECK(cudaGetDeviceCount(&numGpus));
+    for (int i = 0; i < numGpus; i++) {
+        for (int j = i+1; j < numGpus; j++) {
+            CUDA_CHECK(cudaSetDevice(i));
+            int canAccess = 0;
+            CUDA_CHECK(cudaDeviceCanAccessPeer(&canAccess, i, j));
+            if (canAccess == 1) {
+                CUDA_CHECK(cudaDeviceDisablePeerAccess(j, 0));
+                LOG(INFO) << i << " disable peer access " << j;
+            } else {
+                LOG(WARNING) << i << " cannot access peer " << j;
+            }
+        }
+    }
+}
 
 /**
  * Checks if the string is a numeric number
  * @param  str String to check
  * @return     True If the string represents a numeric number
  */
- bool isNumeric(const char * str) {
+bool isNumeric(const char * str) {
     assert(str);
     while ((* str) != '\0') {
         if (!isdigit(* str)) {
