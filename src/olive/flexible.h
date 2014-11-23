@@ -76,12 +76,12 @@ class Vertex {
     }
 
     /** Returns the outdegree of this node. */
-    size_t outdegree(void) {
+    size_t outdegree(void) const {
         return outEdges.size();
     }
 
     /** Returns the indegree of this node. */
-    size_t indegree(void) {
+    size_t indegree(void) const {
         return inEdges.size();
     }
 
@@ -91,7 +91,7 @@ class Vertex {
     }
 
     /** Sorts the outgoing edges according to their destination. */
-    void sortOutEdges(void) {
+    void sortOutEdgesById(void) {
         std::stable_sort(outEdges.begin(), outEdges.end());
     }
 
@@ -117,14 +117,9 @@ class Graph {
      * Some vertices are missing from a partitioned subgraph.
      * Recording the `partitionId`s for those missing vertices.
      * The ghost verties are storesd as key-value pairs.
+     * It can be used to ship a vertex to its remote partition.
      */
     std::map<VertexId, PartitionId> ghostVertices;
-
-    /**
-     * This is a routing table mapping a global vertex id (before partitioning)
-     * to a local continogous id (after paritioning)
-     */
-    std::map<VertexId, VertexId> routingTable;
 
     /** Unique id of a subgraph. */
     PartitionId partitionId;
@@ -153,18 +148,19 @@ class Graph {
     /** 
      * Returns the average degree of the graph in floating number.
      */
-    float averageDegree(void) {
+    float averageDegree(void) const {
         return static_cast<float>(edges()) / nodes();
     }
 
     /**
-     * [hasVertex description]
-     * @param  id_ [description]
-     * @return     [description]
+     * Check the existance of a vertex by specifying its `id`.
+     *
+     * @param  id The id to look up
+     * @return True if it exists
      */
-    bool hasVertex(VertexId id_) const {
+    bool hasVertex(VertexId id) const {
         for (auto v : vertices) {
-            if (v.id == id_) return true;
+            if (v.id == id) return true;
         }
         return false;
     }
@@ -264,7 +260,7 @@ class Graph {
      * 
      * @param path The path to the graph
      */
-    void fromEdgeListFile(char * path) {
+    void fromEdgeListFile(const char * path) {
         FILE * fileHandler = fopen(path, "r");
         if (fileHandler == NULL) {
             LOG(ERROR) << "Can not open graph file: " << path;
@@ -304,33 +300,25 @@ class Graph {
 
     /**
      * Partitioning a graph to subgraphs by a specified `partitionStrategy`.
-     *
-     * The only thing between a subgraph and a complete graph is that
-     * the destination of an edge in a subgraph may not exist in the same
-     * graph.
-     *
+     * Each subgraph has independent id space (instead of the global id space). 
+     * 
      * @param partitionStrategy Decides which patition an vertice belongs to.
      * @param numParts          Number of patitions
      * @return                  A vector of subgraphs
      */
-    std::vector<Graph<VD, ED>> partitionBy(PartitionStrategy &partitionStrategy, PartitionId numParts) {
+    std::vector<Graph<VD, ED>> partitionBy(
+        const PartitionStrategy &partitionStrategy,
+        PartitionId numParts) const {
         std::vector<Graph<VD, ED>> subgraphs = std::vector<Graph<VD, ED>>(numParts);
         for (auto v : vertices) {
             PartitionId partitionId = partitionStrategy.getPartition(v.id, numParts);
             subgraphs[partitionId].partitionId = partitionId;
-            // Mapping the global id to a continugously growing local id
-            VertexId globalId = v.id;
-            VertexId localId = subgraphs[partitionId].vertices.size();
-            subgraphs[partitionId].routingTable.insert(
-                std::pair<VertexId, VertexId>(globalId, localId));
-            v.id = localId;
             subgraphs[partitionId].vertices.push_back(v);
-
             // For other partitons, treat the vertex `v` as an ghost one
             for (int i = 0; i < numParts; i++) {
                 if (i == partitionId) continue;
                 subgraphs[i].ghostVertices.insert(
-                    std::pair<VertexId, PartitionId>(globalId, partitionId));
+                    std::pair<VertexId, PartitionId>(v.id, partitionId));
             }
         }
         return subgraphs;
@@ -379,27 +367,12 @@ class Graph {
         std::cout << "}" << std::endl;
     }
 
-    /**
-     * Print the routing table on the screen (for subgraphs).
-     */
-    void printRoutingTable(void) const {
-        std::cout << "route: {";
-        for (auto r : routingTable) {
-            std::cout << r.first << ": " << r.second << ", ";
-        }
-        std::cout << "}" << std::endl;
-    }
-
     /** Shuffles the vertices. */
-    void shuffle(void) {
+    void shuffleVertices(void) {
         std::random_shuffle(vertices.begin(), vertices.end());
     }
 
-    /**
-     * Sorts the vertices according to their id.
-     * TODO(onesuper): rename it to sortById()
-     */
-    void sort(void) {
+    void sortVerticesById(void) {
         std::stable_sort(vertices.begin(), vertices.end());
     }
 
@@ -411,9 +384,9 @@ class Graph {
     }
 
     /** Sorts the edges. */
-    void sortEdges(void) {
+    void sortEdgesById(void) {
         for (auto &v : vertices) {
-            v.sortOutEdges();
+            v.sortOutEdgesById();
         }
     }
 
