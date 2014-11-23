@@ -121,6 +121,18 @@ class Graph {
     std::map<VertexId, PartitionId> ghostVertices;
 
     /**
+     * This is a routing table mapping a global vertex id (before partitioning)
+     * to a local continogous id (after paritioning)
+     */
+    std::map<VertexId, VertexId> routingTable;
+
+    /** Unique id of a subgraph. */
+    PartitionId partitionId;
+
+    /** Constructor */
+    Graph() : partitionId(0) {}
+
+    /**
      * Returns the total vertex number in the graph.
      */
     size_t nodes(void) const {
@@ -145,6 +157,17 @@ class Graph {
         return static_cast<float>(edges()) / nodes();
     }
 
+    /**
+     * [hasVertex description]
+     * @param  id_ [description]
+     * @return     [description]
+     */
+    bool hasVertex(VertexId id_) const {
+        for (auto v : vertices) {
+            if (v.id == id_) return true;
+        }
+        return false;
+    }
     /**
      * Turning edge tuple reprenstation to flex's edge representation.
      * 
@@ -294,11 +317,20 @@ class Graph {
         std::vector<Graph<VD, ED>> subgraphs = std::vector<Graph<VD, ED>>(numParts);
         for (auto v : vertices) {
             PartitionId partitionId = partitionStrategy.getPartition(v.id, numParts);
+            subgraphs[partitionId].partitionId = partitionId;
+            // Mapping the global id to a continugously growing local id
+            VertexId globalId = v.id;
+            VertexId localId = subgraphs[partitionId].vertices.size();
+            subgraphs[partitionId].routingTable.insert(
+                std::pair<VertexId, VertexId>(globalId, localId));
+            v.id = localId;
             subgraphs[partitionId].vertices.push_back(v);
+
             // For other partitons, treat the vertex `v` as an ghost one
             for (int i = 0; i < numParts; i++) {
                 if (i == partitionId) continue;
-                subgraphs[i].ghostVertices.insert(std::pair<VertexId, PartitionId>(v.id, partitionId));
+                subgraphs[i].ghostVertices.insert(
+                    std::pair<VertexId, PartitionId>(globalId, partitionId));
             }
         }
         return subgraphs;
@@ -340,9 +372,20 @@ class Graph {
      * Print the ghost vertices on the screen (for subgraphs).
      */
     void printGhostVertices(void) const {
-        std::cout << "{";
+        std::cout << "ghost: {";
         for (auto g : ghostVertices) {
             std::cout << g.first << ": " << g.second << ", ";
+        }
+        std::cout << "}" << std::endl;
+    }
+
+    /**
+     * Print the routing table on the screen (for subgraphs).
+     */
+    void printRoutingTable(void) const {
+        std::cout << "route: {";
+        for (auto r : routingTable) {
+            std::cout << r.first << ": " << r.second << ", ";
         }
         std::cout << "}" << std::endl;
     }

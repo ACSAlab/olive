@@ -41,9 +41,10 @@ void unitest_random_paritition(flex::Graph<int, int> &graph, int numPart) {
     RandomEdgeCut random;
     std::vector<flex::Graph<int, int>> subgraphs = graph.partitionBy(random, numPart);
     for (int i = 0; i < numPart; i++) {
-        std::cout << "\n****\n"<< "Partition: " << i << std::endl;
+        std::cout << "\n****\n"<< "Partition: " << subgraphs[i].partitionId << std::endl;
         subgraphs[i].printScatter();
         subgraphs[i].printGhostVertices();
+        subgraphs[i].printRoutingTable();
     }
 }
 
@@ -62,7 +63,8 @@ int main(int argc, char ** argv) {
     std::cout << "averageDegree:" << graph.averageDegree() << std::endl;
     std::cout << "printScatter\n";
     graph.printScatter();
-    graph.printGhostVertices(); // should print nothing
+    graph.printGhostVertices(); // Supposed to print empty
+    graph.printRoutingTable();  // Supposed to print empty
 
     // Sort and shuffle vertices and edges
     //unitest_sort_and_shuffle(graph);
