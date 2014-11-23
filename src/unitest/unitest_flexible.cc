@@ -37,6 +37,16 @@ void unitest_sort_and_shuffle(flex::Graph<int, int> &graph) {
     graph.printScatter();
 }
 
+void unitest_random_paritition(flex::Graph<int, int> &graph, int numPart) {
+    RandomEdgeCut random;
+    std::vector<flex::Graph<int, int>> subgraphs = graph.partitionBy(random, numPart);
+    for (int i = 0; i < numPart; i++) {
+        std::cout << "\n****\n"<< "Partition: " << i << std::endl;
+        subgraphs[i].printScatter();
+        subgraphs[i].printGhostVertices();
+    }
+}
+
 int main(int argc, char ** argv) {
     if (argc < 2) {
         printf("wrong argument");
@@ -44,36 +54,21 @@ int main(int argc, char ** argv) {
     }
 
     flex::Graph<int, int> graph;
-
     graph.fromEdgeListFile(argv[1]);
 
+    // Basic Information
     std::cout << "nodes:" << graph.nodes() << std::endl;
-
     std::cout << "edges:" << graph.edges() << std::endl;
-
     std::cout << "averageDegree:" << graph.averageDegree() << std::endl;
     std::cout << "printScatter\n";
     graph.printScatter();
+    graph.printGhostVertices(); // should print nothing
 
-    // std::cout << "printGather\n";
-    // graph.printGather();
+    // Sort and shuffle vertices and edges
+    //unitest_sort_and_shuffle(graph);
 
-    // std::cout << "printScatter withAttr\n";
-    // graph.printScatter(true);
-
-    // std::cout << "printGather withAttr\n";
-    // graph.printGather(true);
-
-
-    // graph.printDegreeDist();
-
-    RandomEdgeCut random;
-    std::vector<flex::Graph<int, int>> subgraphs = graph.partitionBy(random, 4);
-
-    for (size_t i = 0; i < subgraphs.size(); i++) {
-        std::cout << "Partition: " << i << std::endl;
-        subgraphs[i].printScatter();
-    }
+    // Tests random parition
+    unitest_random_paritition(graph, 4);
 
     return 0;
 }

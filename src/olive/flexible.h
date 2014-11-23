@@ -10,6 +10,7 @@
 #define FLEXIBLE_H
 
 #include <vector>
+#include <map>
 #include <algorithm>
 #include <iostream>
 
@@ -109,14 +110,26 @@ class Vertex {
 template <typename VD, typename ED>
 class Graph {
  public:
+    /** All existing vertices in a graph. */
     std::vector<Vertex<VD, ED>> vertices;
 
-    /** Return the total vertex number in the graph. */
+    /**
+     * Some vertices are missing from a partitioned subgraph.
+     * Recording the `partitionId`s for those missing vertices.
+     * The ghost verties are storesd as key-value pairs.
+     */
+    std::map<VertexId, PartitionId> ghostVertices;
+
+    /**
+     * Returns the total vertex number in the graph.
+     */
     size_t nodes(void) const {
         return vertices.size();
     }
 
-    /** Return the total edge number in the graph. */
+    /** 
+     * Returns the total edge number in the graph.
+     */
     size_t edges(void) const {
         size_t sum = 0;
         for (auto v : vertices) {
@@ -125,13 +138,15 @@ class Graph {
         return sum;
     }
 
-    /** Return the average degree of the graph in floating number. */
+    /** 
+     * Returns the average degree of the graph in floating number.
+     */
     float averageDegree(void) {
         return static_cast<float>(edges()) / nodes();
     }
 
     /**
-     * Turning edge tuple reprenstation to flex's edge representation
+     * Turning edge tuple reprenstation to flex's edge representation.
      * 
      * @note When a graph is built with this method, the vertex-wise attribute
      * is ignored (simply set as 0).
@@ -224,10 +239,7 @@ class Graph {
      * 1    8
      * }}}
      * 
-     * @param path the path to the graph
-     * @param vertexMemoryLevel the desired memory level for the edge partitions
-     * @param edgeMemoryLevel the desired memory level for the edge partitions
-     * 
+     * @param path The path to the graph
      */
     void fromEdgeListFile(char * path) {
         FILE * fileHandler = fopen(path, "r");
@@ -239,7 +251,6 @@ class Graph {
         char temp[1024];                // Shadows the line in a temp buffer
         char * token;                   // Points to the parsed token
         char * remaining;               // Points to the remaining line
-
         double startTime = util::currentTimeMillis();
         while (fgets(line, 1024, fileHandler) != NULL) {
             if (line[0] != '\0' && line[0] != '#') {
@@ -250,7 +261,6 @@ class Graph {
                 while ((token = strsep(&remaining, " \t")) != NULL) {
                     tokens.push_back(token);
                 }
-
                 if (tokens.size() < 2 || !util::isNumeric(tokens[0]) ||
                     !util::isNumeric(tokens[1])) {
                     LOG(WARNING) << "Invalid line: " << line;
@@ -258,7 +268,6 @@ class Graph {
                 }
                 VertexId srcId = static_cast<VertexId>(atol(tokens[0]));
                 VertexId dstId = static_cast<VertexId>(atol(tokens[1]));
-
                 if (tokens.size() == 2) {
                     addEdgeTuple(EdgeTuple<int>(srcId, dstId, 1));
                 } else {
@@ -271,7 +280,7 @@ class Graph {
     }
 
     /**
-     * Partioning a graph to subgraphs by a specified `partitionStrategy`.
+     * Partitioning a graph to subgraphs by a specified `partitionStrategy`.
      *
      * The only thing between a subgraph and a complete graph is that
      * the destination of an edge in a subgraph may not exist in the same
@@ -286,14 +295,19 @@ class Graph {
         for (auto v : vertices) {
             PartitionId partitionId = partitionStrategy.getPartition(v.id, numParts);
             subgraphs[partitionId].vertices.push_back(v);
+            // For other partitons, treat the vertex `v` as an ghost one
+            for (int i = 0; i < numParts; i++) {
+                if (i == partitionId) continue;
+                subgraphs[i].ghostVertices.insert(std::pair<VertexId, PartitionId>(v.id, partitionId));
+            }
         }
         return subgraphs;
     }
 
     /**
-     * Print the graph on the screen as the outgoing edges
+     * Print the graph on the screen as the outgoing edges.
      */
-    void printScatter(bool withAttr = false) {
+    void printScatter(bool withAttr = false) const {
         for (auto v : vertices) {
             std::cout << "[" << v.id;
             if (withAttr) std::cout << ", " + v.attr;
@@ -307,9 +321,9 @@ class Graph {
     }
 
     /**
-     * Print the graph on the screen as the ingoing edges
+     * Print the graph on the screen as the ingoing edges.
      */
-    void printGather(bool withAttr = false) {
+    void printGather(bool withAttr = false) const {
         for (auto v : vertices) {
             std::cout << "[" << v.id;
             if (withAttr) std::cout << ", " + v.attr;
@@ -322,12 +336,26 @@ class Graph {
         }
     }
 
+    /**
+     * Print the ghost vertices on the screen (for subgraphs).
+     */
+    void printGhostVertices(void) const {
+        std::cout << "{";
+        for (auto g : ghostVertices) {
+            std::cout << g.first << ": " << g.second << ", ";
+        }
+        std::cout << "}" << std::endl;
+    }
+
     /** Shuffles the vertices. */
     void shuffle(void) {
         std::random_shuffle(vertices.begin(), vertices.end());
     }
 
-    /** Sorts the vertices according to their id. */
+    /**
+     * Sorts the vertices according to their id.
+     * TODO(onesuper): rename it to sortById()
+     */
     void sort(void) {
         std::stable_sort(vertices.begin(), vertices.end());
     }

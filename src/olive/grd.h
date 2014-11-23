@@ -17,15 +17,19 @@
  */
 template<typename T>
 class GRD {
-    size_t size;
-    T * elemsHost;
-    T * elemsDevice;
+ public:
+    T *     elemsHost;    // Points to the host-allocated buffer
+    T *     elemsDevice;  // Points to the GPU-allocated buffer
+    size_t  length;       // The length of the buffer
 
-    explicit GRD(size_t size_) {
-        size = size_;
-        elemsHost = reinterrupt_cast<T *> malloc(elemsHost, size);
+    /**
+     * Allocate the host- and device-resident buffer of length `len`.
+     */
+    explicit GRD(size_t len) {
+        length = len;
+        elemsHost = reinterrupt_cast<T *> malloc(elemsHost, len * sizeof(T));
         CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **>(&elemsDevice),
-                                  size * sizeof(T), cudaHostAllocPortable));
+                                  len * sizeof(T), cudaHostAllocPortable));
     }
 
     /**
@@ -33,7 +37,7 @@ class GRD {
      * Do not check the boundaries for speed.
      */
     __host__
-    inline T & operator[] (int index) const {
+    inline T& operator[] (int index) const {
         return elemsHost[index];
     }
 
@@ -41,7 +45,7 @@ class GRD {
      * Overloads the subscript to access an element on device side.
      */
     __device__
-    inline T & operator[] (int index) const {
+    inline T& operator[] (int index) const {
         return elemsDevice[index];
     }
 
@@ -57,6 +61,7 @@ class GRD {
                               size * sizeof(T), cudaMemcpyDefault));
     }
 
+    /** Free both host- and device- resident buffers */
     ~GRD(void) {
         free(elemsHost);
         CUDA_CHECK(cudaFreeHost(elemsHost));

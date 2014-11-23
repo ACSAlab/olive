@@ -18,8 +18,8 @@
  * representation. 
  * 
  * TODO(onesuper): Paritioning according to the topology of graph.
- * A partition strategy may possibly consider some of the 
- * graph attributes, e.g. outdegree, etc.
+ * A partition strategy may possibly consider some of the graph attributes,
+ * e.g. outdegree, etc.
  */
 class PartitionStrategy {
  public:
