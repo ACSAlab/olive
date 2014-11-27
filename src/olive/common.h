@@ -21,7 +21,7 @@
 
 
 /**
- * A wrapper that asserts the success of cuda calls
+ * A wrapper that asserts the success of CUDA calls
  * TODO(onesuper): replace it with a method which throws an exception
  * 
  */
@@ -29,7 +29,7 @@
     do {                                                                \
         cudaError_t err = cuda_call;                                    \
         if (err != cudaSuccess) {                                       \
-        fprintf(stderr, "Cuda Error in file '%s' in line %i : %s.\n",   \
+        fprintf(stderr, "CUDA Error in file '%s' in line %i : %s.\n",   \
                 __FILE__, __LINE__, cudaGetErrorString(err));           \
         assert(false);                                                  \
         }                                                               \

@@ -20,7 +20,7 @@ namespace util {
 
 /**
  * Enable all-to-all peer access
- * TODO(onesuper): Temporialy making the following functions a part of utilities.
+ * TODO(onesuper): Temporarily making the following functions a part of utilities.
  */
 void enableAllPeerAccess(void) {
     int numGpus = 0;

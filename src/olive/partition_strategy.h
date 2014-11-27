@@ -17,9 +17,9 @@
  * An abstract interface for partitioning vertices for flexible graph 
  * representation. 
  * 
- * TODO(onesuper): Paritioning according to the topology of graph.
+ * TODO(onesuper): Partitioning according to the topology of graph.
  * A partition strategy may possibly consider some of the graph attributes,
- * e.g. outdegree, etc.
+ * e.g. out-degree, etc.
  */
 class PartitionStrategy {
  public:

@@ -11,6 +11,7 @@
 
 #include <vector>
 #include <map>
+#include <utility>
 #include <algorithm>
 #include <iostream>
 
@@ -22,9 +23,8 @@
 
 
 namespace flex {
-
 /**
- * Directed edge structure for flexible graph reprenstation. 
+ * Directed edge structure for flexible graph representation. 
  * Each edge contains an `id` standing for either its destination or its source,
  * and its associated attribute.
  *
@@ -48,11 +48,10 @@ class Edge {
     }
 };
 
-
 /**
- * Edge structure for flexible graph reprenstation. Each vertex contains
- * an `id`, all its outgoing edges, all its ingoing edges, and an arbitrary
- * attribtue.
+ * Vertex entry for flexible graph representation. Each vertex contains an `id`,
+ * all its outgoing edges, all its ingoing edges, and an arbitrary attribute.
+ * A remote (ghost) vertex in a subgraph has not this entry.
  *
  * @note Storing the outgoing edges for each vertex is sufficient to represent
  * the graph. `inEdges` is just for analyzing the topology of the graph.
@@ -64,10 +63,8 @@ template<typename VD, typename ED>
 class Vertex {
  public:
     std::vector<Edge<ED>> outEdges;
-    std::vector<Edge<ED>> inEdges;
-
-    VertexId id;
-    VD attr;
+    VertexId    id;
+    VD          attr;
 
     /** Constructor */
     explicit Vertex(VertexId id_, VD d) {
@@ -75,23 +72,26 @@ class Vertex {
         attr = d;
     }
 
-    /** Returns the outdegree of this node. */
+    /** Reachability to anther vertex */
+    bool isReachableTo(VertexId other) const {
+        for (auto e : outEdges) {
+            if (other == e.id) return true;
+        }
+        return false;
+    }
+
+    /** Returns the out-degree of this node. */
     size_t outdegree(void) const {
         return outEdges.size();
     }
 
-    /** Returns the indegree of this node. */
-    size_t indegree(void) const {
-        return inEdges.size();
-    }
-
     /** Shuffles the outgoing edges. */
-    void shuffleOutEdges(void) {
+    void shuffleEdges(void) {
         std::random_shuffle(outEdges.begin(), outEdges.end());
     }
 
     /** Sorts the outgoing edges according to their destination. */
-    void sortOutEdgesById(void) {
+    void sortEdgesById(void) {
         std::stable_sort(outEdges.begin(), outEdges.end());
     }
 
@@ -102,7 +102,7 @@ class Vertex {
 };
 
 /**
- * Flexible graph representation for in-memory quering or manipulating.
+ * Flexible graph representation for in-memory querying or manipulating.
  *
  * @tparam VD the vertex attribute type
  * @tparam ED the edge attribute type
@@ -115,11 +115,14 @@ class Graph {
 
     /**
      * Some vertices are missing from a partitioned subgraph.
-     * Recording the `partitionId`s for those missing vertices.
-     * The ghost verties are storesd as key-value pairs.
+     * Records the `partitionId` for those missing vertices.
+     * The ghost vertices are stored as key-value pairs.
      * It can be used to ship a vertex to its remote partition.
+     *
+     * @note For a remote vertex, a remote local offset is recorded associated
+     * with the `partitionId`.
      */
-    std::map<VertexId, PartitionId> ghostVertices;
+    std::map<VertexId, std::pair<PartitionId, VertexId>> ghostVertices;
 
     /** Unique id of a subgraph. */
     PartitionId partitionId;
@@ -153,7 +156,7 @@ class Graph {
     }
 
     /**
-     * Check the existance of a vertex by specifying its `id`.
+     * Check the existence of a vertex by specifying its `id`.
      *
      * @param  id The id to look up
      * @return True if it exists
@@ -165,7 +168,7 @@ class Graph {
         return false;
     }
     /**
-     * Turning edge tuple reprenstation to flex's edge representation.
+     * Turning edge tuple representation to flex's edge representation.
      * 
      * @note When a graph is built with this method, the vertex-wise attribute
      * is ignored (simply set as 0).
@@ -174,19 +177,13 @@ class Graph {
      */
     void addEdgeTuple(EdgeTuple<ED> edgeTuple) {
         Edge<ED> outEdge(edgeTuple.dstId, edgeTuple.attr);
-        Edge<ED> inEdge(edgeTuple.srcId, edgeTuple.attr);
         bool srcExists = false;
-        bool dstExists = false;
         // If the target node already exists, append the edge directly.
-        for (auto &v : vertices) {
-            if (srcExists && dstExists) break;
+        for (auto& v : vertices) {
             if (v.id == edgeTuple.srcId) {
                 v.outEdges.push_back(outEdge);
                 srcExists = true;
-            }
-            if (v.id == edgeTuple.dstId) {
-                v.inEdges.push_back(inEdge);
-                dstExists = true;
+                break;
             }
         }
         if (!srcExists) {
@@ -194,15 +191,10 @@ class Graph {
             newNode.outEdges.push_back(outEdge);
             vertices.push_back(newNode);
         }
-        if (!dstExists) {
-            Vertex<int, ED> newNode(edgeTuple.dstId, 0);
-            newNode.inEdges.push_back(inEdge);
-            vertices.push_back(newNode);
-        }
     }
 
     /**
-     * Prints the outdegree distribution in log-style on the screen.
+     * Prints the out-degree distribution in log-style on the screen.
      * e.g., the output will look:
      * {{{
      * outDegreeLog[0]: 0         5%
@@ -301,24 +293,31 @@ class Graph {
     /**
      * Partitioning a graph to subgraphs by a specified `partitionStrategy`.
      * Each subgraph has independent id space (instead of the global id space). 
-     * 
-     * @param partitionStrategy Decides which patition an vertice belongs to.
-     * @param numParts          Number of patitions
+     *
+     * @note We rely on the local offset to look for a vertex from another 
+     * partition. So it is not allowed to shuffle vertices in any subgraph.
+     * It is an convenience for converting CSR representation. See `partition.cuh`.
+     *
+     * @param partitionStrategy Decides which partition an vertex belongs to.
+     * @param numParts          Number of partitions
      * @return                  A vector of subgraphs
      */
-    std::vector<Graph<VD, ED>> partitionBy(
-        const PartitionStrategy &partitionStrategy,
+    std::vector<Graph<VD, ED>> partitionBy(const PartitionStrategy &partitionStrategy,
         PartitionId numParts) const {
-        std::vector<Graph<VD, ED>> subgraphs = std::vector<Graph<VD, ED>>(numParts);
+        auto subgraphs = std::vector<Graph<VD, ED>>(numParts);
+        for (PartitionId i = 0; i < numParts; i++) {
+            subgraphs[i].partitionId = i;
+        }
         for (auto v : vertices) {
             PartitionId partitionId = partitionStrategy.getPartition(v.id, numParts);
-            subgraphs[partitionId].partitionId = partitionId;
             subgraphs[partitionId].vertices.push_back(v);
-            // For other partitons, treat the vertex `v` as an ghost one
-            for (int i = 0; i < numParts; i++) {
+            VertexId localOffset = subgraphs[partitionId].vertices.size()-1;
+            auto remoteVertex = std::pair<PartitionId, VertexId>(partitionId, localOffset);
+            // For other partitions, treat `v` as an ghost one.
+            for (PartitionId i = 0; i < numParts; i++) {
                 if (i == partitionId) continue;
                 subgraphs[i].ghostVertices.insert(
-                    std::pair<VertexId, PartitionId>(v.id, partitionId));
+                    std::pair<VertexId, std::pair<PartitionId, VertexId>>(v.id, remoteVertex));
             }
         }
         return subgraphs;
@@ -327,7 +326,7 @@ class Graph {
     /**
      * Print the graph on the screen as the outgoing edges.
      */
-    void printScatter(bool withAttr = false) const {
+    void print(bool withAttr = false) const {
         for (auto v : vertices) {
             std::cout << "[" << v.id;
             if (withAttr) std::cout << ", " + v.attr;
@@ -341,28 +340,13 @@ class Graph {
     }
 
     /**
-     * Print the graph on the screen as the ingoing edges.
-     */
-    void printGather(bool withAttr = false) const {
-        for (auto v : vertices) {
-            std::cout << "[" << v.id;
-            if (withAttr) std::cout << ", " + v.attr;
-            std::cout << "] ";
-            for (auto e : v.inEdges) {
-                std::cout << " <-" << e.id;
-                if (withAttr) std::cout << ", " << e.attr;
-            }
-            std::cout << std::endl;
-        }
-    }
-
-    /**
      * Print the ghost vertices on the screen (for subgraphs).
      */
     void printGhostVertices(void) const {
         std::cout << "ghost: {";
         for (auto g : ghostVertices) {
-            std::cout << g.first << ": " << g.second << ", ";
+            std::cout << g.first << ": <" << g.second.first << ", "
+                      << g.second.second << ">, ";
         }
         std::cout << "}" << std::endl;
     }
@@ -379,15 +363,15 @@ class Graph {
 
     /** Shuffles the edges. */
     void shuffleEdges(void) {
-        for (auto &v : vertices) {
-            v.shuffleOutEdges();
+        for (auto& v : vertices) {
+            v.shuffleEdges();
         }
     }
 
     /** Sorts the edges by id. */
     void sortEdgesById(void) {
-        for (auto &v : vertices) {
-            v.sortOutEdgesById();
+        for (auto& v : vertices) {
+            v.sortEdgesById();
         }
     }
 

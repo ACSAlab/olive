@@ -23,7 +23,7 @@ class EdgeTuple {
     VertexId dstId;     /** The vertex id of the target vertex */
     ED attr;            /** The attribute associated with the edge */
 
-    /** Construtor with all three parameters */
+    /** Constructor with all three parameters */
     explicit EdgeTuple(VertexId src, VertexId dst, ED d) {
         srcId = src;
         dstId = dst;

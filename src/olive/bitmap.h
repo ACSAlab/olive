@@ -1,5 +1,5 @@
 /**
- * A simple bitset implementation
+ * A simple bit set implementation
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-11-05
