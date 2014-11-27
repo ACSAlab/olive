@@ -17,7 +17,7 @@
 #include "grd.h"
 #include "flexible.h"
 #include "utils.h"
-
+#include "logging.h"
 
 /**
  * Managing the resource for each GPU-resident graph partition.
@@ -151,10 +151,10 @@ class Partition {
      */
     void fromSubgraph(const flex::Graph<int, int> &subgraph) {
         partitionId = subgraph.partitionId;
-        deviceId = 0;
-        vertices.reserve(subgraph.nodes()+1);
-        edges.reserve(subgraph.edges());
-        globalIds.reserve(subgraph.nodes());
+        deviceId = partitionId % 2;
+        vertices.reserve(subgraph.nodes()+1, deviceId);
+        edges.reserve(subgraph.edges(), deviceId);
+        globalIds.reserve(subgraph.nodes(), deviceId);
         // Building up the `globalIds` and a routing table which maps the global 
         // id to local.
         std::map<VertexId, VertexId> routingToLocal;
@@ -180,6 +180,9 @@ class Partition {
         vertices[vertexCount] = edgeCount;
         assert(vertexCount == subgraph.nodes());
         assert(edgeCount == subgraph.edges());
+        vertices.cache();
+        edges.cache();
+        globalIds.cache();
     }
 };
 
