@@ -179,17 +179,27 @@ class Graph {
     void addEdgeTuple(EdgeTuple<ED> edgeTuple) {
         Edge<ED> outEdge(edgeTuple.dstId, edgeTuple.attr);
         bool srcExists = false;
+        bool dstExists = false;
         // If the target node already exists, append the edge directly.
         for (auto& v : vertices) {
+            if (srcExists && dstExists) break;
             if (v.id == edgeTuple.srcId) {
                 v.outEdges.push_back(outEdge);
                 srcExists = true;
-                break;
+            }
+            if (v.id == edgeTuple.dstId) {
+                //v.inEdges.push_back(inEdge);
+                dstExists = true;
             }
         }
         if (!srcExists) {
             Vertex<int, ED> newNode(edgeTuple.srcId, 0);
             newNode.outEdges.push_back(outEdge);
+            vertices.push_back(newNode);
+        }
+        if (!dstExists) {
+            Vertex<int, ED> newNode(edgeTuple.dstId, 0);
+            // newNode.inEdges.push_back(inEdge);
             vertices.push_back(newNode);
         }
     }
