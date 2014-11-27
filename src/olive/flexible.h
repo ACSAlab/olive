@@ -62,7 +62,7 @@ class Edge {
 template<typename VD, typename ED>
 class Vertex {
  public:
-    std::vector<Edge<ED>> outEdges;
+    std::vector< Edge<ED> > outEdges;
     VertexId    id;
     VD          attr;
 
@@ -111,18 +111,19 @@ template <typename VD, typename ED>
 class Graph {
  public:
     /** All existing vertices in a graph. */
-    std::vector<Vertex<VD, ED>> vertices;
+    std::vector< Vertex<VD, ED> > vertices;
 
     /**
      * Some vertices are missing from a partitioned subgraph.
      * Records the `partitionId` for those missing vertices.
-     * The ghost vertices are stored as key-value pairs.
+     * The ghost vertices are stored as key-value pairs, where the key is the
+     * global id and the value is a (partitionId, localId) pair.
      * It can be used to ship a vertex to its remote partition.
      *
      * @note For a remote vertex, a remote local offset is recorded associated
      * with the `partitionId`.
      */
-    std::map<VertexId, std::pair<PartitionId, VertexId>> ghostVertices;
+    std::map< VertexId, std::pair<PartitionId, VertexId> > ghostVertices;
 
     /** Unique id of a subgraph. */
     PartitionId partitionId;
@@ -302,7 +303,7 @@ class Graph {
      * @param numParts          Number of partitions
      * @return                  A vector of subgraphs
      */
-    std::vector<Graph<VD, ED>> partitionBy(const PartitionStrategy &partitionStrategy,
+    std::vector< Graph<VD, ED> > partitionBy(const PartitionStrategy &partitionStrategy,
         PartitionId numParts) const {
         auto subgraphs = std::vector<Graph<VD, ED>>(numParts);
         for (PartitionId i = 0; i < numParts; i++) {
@@ -312,12 +313,11 @@ class Graph {
             PartitionId partitionId = partitionStrategy.getPartition(v.id, numParts);
             subgraphs[partitionId].vertices.push_back(v);
             VertexId localOffset = subgraphs[partitionId].vertices.size()-1;
-            auto remoteVertex = std::pair<PartitionId, VertexId>(partitionId, localOffset);
             // For other partitions, treat `v` as an ghost one.
+            auto ghost = std::pair<PartitionId, VertexId>(partitionId, localOffset);
             for (PartitionId i = 0; i < numParts; i++) {
                 if (i == partitionId) continue;
-                subgraphs[i].ghostVertices.insert(
-                    std::pair<VertexId, std::pair<PartitionId, VertexId>>(v.id, remoteVertex));
+                subgraphs[i].ghostVertices[v.id] = ghost;
             }
         }
         return subgraphs;

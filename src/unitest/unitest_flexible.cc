@@ -52,14 +52,14 @@ void unitest_random_paritition(const flex::Graph<int, int> &graph, int numPart) 
 }
 
 int main(int argc, char ** argv) {
-    if (argc < 2) {
+    if (argc < 3) {
         printf("wrong argument");
         return 1;
     }
 
     flex::Graph<int, int> graph;
     graph.fromEdgeListFile(argv[1]);
-
+    PartitionId numParts = atoi(argv[2]);
     // Basic Information
     std::cout << "nodes:" << graph.nodes() << std::endl;
     std::cout << "edges:" << graph.edges() << std::endl;
@@ -71,17 +71,13 @@ int main(int argc, char ** argv) {
     // Sort and shuffle vertices and edges
     //unitest_sort_and_shuffle(graph);
 
-    // unitest_random_paritition(graph, 4);
-    // unitest_random_paritition(graph, 3);
-    // unitest_random_paritition(graph, 2);
-    // unitest_random_paritition(graph, 1);
 
     // Shuffle!
     graph.shuffleVertices();
     graph.shuffleEdges();
 
     // Tests random parition after shuffle
-    unitest_random_paritition(graph, 4);
+    unitest_random_paritition(graph, numParts);
 
     return 0;
 }

@@ -10,41 +10,107 @@
 #ifndef PARTITION_H
 #define PARTITION_H
 
+#include <vector>
+#include <map>
+#include <utility>
+
 #include "grd.h"
+#include "flexible.h"
+#include "utils.h"
+
 
 /**
- * Managing the resouce for each GPU-resident graph partition.
+ * Managing the resource for each GPU-resident graph partition.
  * 
-
- *
- * Each graph parition is stored in (Compressed Sparsed Row) format for its
+ * Each graph partition is stored in (Compressed Sparse Row) format for its
  * efficiency. In effect, CSR storage minimizes the memory footprint at the 
  * expense of bringing indirect memory access.
+ *
+ * Partitions communicate with each other through a buffer-copying scheme: 
+ * e.g. One partition copies its out-buffer to the corresponding in-buffer of 
+ * the other partition.
+ * 
+ * @note The original vertex id in original graph is mapped to a new local id
+ * in a graph partition. e.g. The ids are continuous from 0 to len(`vertices`)-1;
+ *
  */
 class Partition {
  public:
     /**
-     * @note It is always a convention that each partion is assigned to a device
-     * with the same logical ID. e.g., `Partiton 0` is assigned to `Device 0`.
+     * If a vertex's `partitionId` equals the partition's `partitionId`, then it
+     * refers to a local vertex. Otherwise `id` refers to a remote one. 
      */
-    PartitionId     partitionId;
+    class Vertex {
+     public:
+        PartitionId  partitionId;
+        VertexId     id;
+        explicit Vertex(PartitionId pid, VertexId id_) : partitionId(pid), id(id_) {}
+    };
 
     /**
-     * Stores the starting indices of vertices' outgoing edges.
-     * For example, vertices[i] tells where its outgoing edges locate. 
-     * The number of it outgoing edges is given by vertices[i+1] - vertices[i].
+     * Stub information sending to a remote vertex.
+     * @note `id` here is .
      */
-    GRD<EdgeId>     vertices;
+    class VertexMessage {
+     public:
+        VertexId  id;
+        void *    message;
+    };
+
+    /** Partition identification. Obtained via a pass-in subgraph */
+    PartitionId    partitionId;
+
+    /** The device this partition binds to */
+    PartitionId    deviceId;
 
     /**
-     * Stores the destination vertex id to represent a complete outgoing edge. 
+     * Stores the starting indices for querying outgoing edges of local vertices 
+     * (vertices that in this partition).
+     * e.g., vertices[i] tells where the outgoing edges of vertex `i` are.
+     * The number of its outgoing edges is given by vertices[i+1] - vertices[i].
+     *
+     * @note a.k.a row offsets in matrix terminology.
      */
-    GRD<VertexId>   edges;
+    GRD<EdgeId>    vertices;
 
-    ghostVertices;
+    /**
+     * Stores the destination vertex to represent an outgoing edge.
+     * It differentiates the boundary edges by `[[DstVertex]].paritionId`.
+     * That is if `[[DstVertex]].paritionId` != this->partitionId,
+     * the destination vertex is in a remote partition.
+     * 
+     * @note Boundary edges are those outgoing edges whose destination vertex
+     * is in other partitions. When traversing an boundary edge, a message will
+     * be push to `outbox`.
+     *
+     * @note a.k.a column indices in matrix terminology.
+     */
+    GRD<Vertex>    edges;
 
-    RoutingTable    outBoxTable;
-    RoutingTable    inBoxTable;
+    /**
+     * Mapping the local linear ids in a partition to original ids when 
+     * aggregating the final results.
+     */
+    GRD<VertexId>  globalIds;
+
+    /**
+     * The messages sending to remote vertices are organized as hash tables.
+     *
+     * TODO: using a double-buffering method.
+     */
+    std::vector< GRD<VertexMessage> > outboxes;
+
+    /**
+     * Messages received from remote vertices.
+     */
+    std::vector< GRD<VertexMessage> > inboxes;
+
+    /**
+     * Send message 
+     * @param other The counterpart
+     */
+    //void send(Partition &other) {}
+
 
     /**
      * Enables overlapped communication and computation.
@@ -59,26 +125,63 @@ class Partition {
     cudaEvent_t     startEvent;
     cudaEvent_t     endEvent;
 
- public:
+    // void initialize(void) {
+    //     CALL_SAFE(cudaSetDevice(deviceId));
+    //     CALL_SAFE(cudaStreamCreate(&streams[0]));
+    //     CALL_SAFE(cudaStreamCreate(&streams[1]));
+    //     CALL_SAFE(cudaEventCreate(&startEvent));
+    //     CALL_SAFE(cudaEventCreate(&endEvent));
+    // }
 
-    Partition(PartitionId pid) {
-        partitionId = pid;
-        CALL_SAFE(cudaSetDevice(partitionId));
-        CALL_SAFE(cudaStreamCreate(&streams[0]));
-        CALL_SAFE(cudaStreamCreate(&streams[1]));
-        CALL_SAFE(cudaEventCreate(&startEvent));
-        CALL_SAFE(cudaEventCreate(&endEvent));
+    // void finalize(void) {
+    //     CALL_SAFE(cudaSetDevice(deviceId));
+    //     CALL_SAFE(cudaStreamDestroy(streams[0]));
+    //     CALL_SAFE(cudaStreamDestroy(streams[1]));
+    //     CALL_SAFE(cudaEventDestroy(startEvent));
+    //     CALL_SAFE(cudaEventDestroy(endEvent));
+    // }
+
+    /**
+     * Initializing a partition from a subgraph in flexible representation. 
+     * By default, the partition is bound to device 0.
+     *
+     * The subgraph marks the vertices with a global id. Records the original
+     * ids in `globalIds`.
+     * 
+     */
+    void fromSubgraph(const flex::Graph<int, int> &subgraph) {
+        partitionId = subgraph.partitionId;
+        deviceId = 0;
+        vertices.reserve(subgraph.nodes()+1);
+        edges.reserve(subgraph.edges());
+        globalIds.reserve(subgraph.nodes());
+        // Building up the `globalIds` and a routing table which maps the global 
+        // id to local.
+        std::map<VertexId, VertexId> routingToLocal;
+        VertexId localId = 0;
+        for (auto v : subgraph.vertices) {
+            globalIds[localId++] = v.id;
+            routingToLocal.insert(std::pair<VertexId, VertexId>(v.id, localId));
+        }
+        VertexId vertexCount = 0;
+        EdgeId   edgeCount   = 0;
+        for (auto v : subgraph.vertices) {
+            vertices[vertexCount++] = edgeCount;
+            for (auto e : v.outEdges) {
+                if (subgraph.hasVertex(e.id)) {  // In this partition
+                    edges[edgeCount++] = Vertex(partitionId, routingToLocal[e.id]);
+                } else {                         // In remote partition
+                    auto it = subgraph.ghostVertices.find(e.id);
+                    assert(it != subgraph.ghostVertices.end());
+                    edges[edgeCount++] = Vertex(it->second.first, it->second.second);
+                }
+            }
+        }
+        vertices[vertexCount] = edgeCount;
+        assert(vertexCount == subgraph.nodes());
+        assert(edgeCount == subgraph.edges());
     }
-
-
-    ~Partion() {
-        CALL_SAFE(cudaStreamDestroy(streams[0]));
-        CALL_SAFE(cudaStreamDestroy(streams[1]));
-        CALL_SAFE(cudaEventDestroy(startEvent));
-        CALL_SAFE(cudaEventDestroy(endEvent));
-    }
-
-}
+};
 
 
 
