@@ -23,9 +23,10 @@ class GRD {
     T *     elemsDevice;  /** Points to the GPU-allocated buffer */
     size_t  length;       /** The length of the buffer */
     int     deviceId;     /** The device GRD locates at */
+
  public:
     /** List Initializer */
-    explicit GRD() : elemsHost(NULL), elemsDevice(NULL), length(0), deviceId(0) {}
+    GRD(): elemsHost(NULL), elemsDevice(NULL), length(0), deviceId(-1) {}
 
     /**
      * Overloads the subscript to access an element on host side.
@@ -41,7 +42,7 @@ class GRD {
     }
 
     /** Returning the size */
-    inline size_t size(void) const {
+    inline size_t size() const {
         return length;
     }
 
@@ -50,50 +51,50 @@ class GRD {
      * `id`.
      */
     inline void reserve(size_t len, int id) {
+        assert(len > 0);
+        assert(id >= 0);
         deviceId = id;
         length = len;
-        assert(len > 0);
         elemsHost = reinterpret_cast<T *>(malloc(len * sizeof(T)));
         CUDA_CHECK(cudaSetDevice(deviceId));
         CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **>(&elemsDevice),
                                   len * sizeof(T), cudaHostAllocPortable));
-        LOG(DEBUG) << length << " data reserve on GPU" << deviceId;
     }
 
     /** 
      * Write-backs the dataset from GPU's on-board memory to host memory.
      */
-    inline void persist(void) {
+    inline void persist() {
+        assert(length > 0);
         CUDA_CHECK(cudaSetDevice(deviceId));
         CUDA_CHECK(cudaMemcpy(elemsDevice, elemsHost,
                               length * sizeof(T), cudaMemcpyDefault));
-        LOG(DEBUG) << length << " data persist on GPU " << deviceId;
     }
 
     /** 
      * Caches the dataset in GPU's on-board memory.
      */
-    inline void cache(void) {
+    inline void cache() {
+        assert(length > 0);
         CUDA_CHECK(cudaSetDevice(deviceId));
         CUDA_CHECK(cudaMemcpy(elemsDevice, elemsHost,
                               length * sizeof(T), cudaMemcpyDefault));
-        LOG(DEBUG) << length << " data cache on GPU " << deviceId;
     }
 
     /** 
      * Free both host- and device- resident buffers.
      */
-    inline void del(void) {
-        if (elemsHost)   free(elemsHost);
-        CUDA_CHECK(cudaSetDevice(deviceId));
+    inline void del() {
+        if (elemsHost) 
+            free(elemsHost);
         if (elemsDevice) {
             CUDA_CHECK(cudaSetDevice(deviceId));
             CUDA_CHECK(cudaFreeHost(elemsDevice));
-            LOG(DEBUG) << length << " data delete on GPU " << deviceId;
         }
     }
 
-    ~GRD(void) {
+    /** Destructor **/
+    ~GRD() {
         del();
     }
 };

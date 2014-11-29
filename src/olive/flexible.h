@@ -26,7 +26,9 @@ namespace flex {
 /**
  * Directed edge structure for flexible graph representation. 
  * Each edge contains an `id` standing for either its destination or its source,
- * and its associated attribute.
+ * and its associated attribute. For an outgoing edge, `id` is the destination.
+ * While for an incoming edge, `id` is the source. 
+ * 
  *
  * @tparam ED the edge attribute type
  */
@@ -90,17 +92,17 @@ class Vertex {
     }
 
     /** Returns the out-degree of this node. */
-    size_t outdegree(void) const {
+    size_t outdegree() const {
         return outEdges.size();
     }
 
     /** Shuffles the outgoing edges. */
-    void shuffleEdges(void) {
+    void shuffleEdges() {
         std::random_shuffle(outEdges.begin(), outEdges.end());
     }
 
     /** Sorts the outgoing edges according to their destination. */
-    void sortEdgesById(void) {
+    void sortEdgesById() {
         std::stable_sort(outEdges.begin(), outEdges.end());
     }
 
@@ -150,14 +152,14 @@ class Graph {
     /**
      * Returns the total vertex number in the graph.
      */
-    size_t nodes(void) const {
+    size_t nodes() const {
         return vertices.size();
     }
 
     /** 
      * Returns the total edge number in the graph.
      */
-    size_t edges(void) const {
+    size_t edges() const {
         size_t sum = 0;
         for (auto v : vertices) {
             sum += v.outdegree();
@@ -168,7 +170,7 @@ class Graph {
     /** 
      * Returns the average degree of the graph in floating number.
      */
-    float averageDegree(void) const {
+    float averageDegree() const {
         return static_cast<float>(edges()) / nodes();
     }
 
@@ -231,7 +233,7 @@ class Graph {
      * ...
      * }}}
      */
-     void printDegreeDist(void) {
+     void printDegreeDist() {
         size_t outDegreeLog[32];
         int slotMax = 0;
         for (int i = 0; i < 32; i++) {
@@ -386,7 +388,7 @@ class Graph {
     /**
      * Print the ghost vertices on the screen (for subgraphs).
      */
-    void printGhostVertices(void) const {
+    void printGhostVertices() const {
         std::cout << "ghost: {";
         for (auto g : ghostVertices) {
             std::cout << g.first << ": <" << g.second.first << ", "
@@ -396,24 +398,24 @@ class Graph {
     }
 
     /** Shuffles the vertices. */
-    void shuffleVertices(void) {
+    void shuffleVertices() {
         std::random_shuffle(vertices.begin(), vertices.end());
     }
 
     /** Sorts the vertices by id. */
-    void sortVerticesById(void) {
+    void sortVerticesById() {
         std::stable_sort(vertices.begin(), vertices.end());
     }
 
     /** Shuffles the edges. */
-    void shuffleEdges(void) {
+    void shuffleEdges() {
         for (auto& v : vertices) {
             v.shuffleEdges();
         }
     }
 
     /** Sorts the edges by id. */
-    void sortEdgesById(void) {
+    void sortEdgesById() {
         for (auto& v : vertices) {
             v.sortEdgesById();
         }
