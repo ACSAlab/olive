@@ -63,6 +63,15 @@ template<typename VD, typename ED>
 class Vertex {
  public:
     std::vector< Edge<ED> > outEdges;
+
+    /**
+     * Storing only outEdges is sufficient to express the topology of a graph.
+     * However, keeping this information is useful when allocating the message
+     * buffers before-hand on GPUs.
+     */
+    std::vector< Edge<ED> > inEdges;
+
+
     VertexId    id;
     VD          attr;
 
@@ -114,11 +123,15 @@ class Graph {
     std::vector< Vertex<VD, ED> > vertices;
 
     /**
-     * Some vertices are missing from a partitioned subgraph.
-     * Records the `partitionId` for those missing vertices.
+     * Some vertices are missing from a partitioned subgraph. Records the
+     * `partitionId` and the local id for those missing vertices.
      * The ghost vertices are stored as key-value pairs, where the key is the
      * global id and the value is a (partitionId, localId) pair.
-     * It can be used to ship a vertex to its remote partition.
+     * It can be used to establish a routing table which ships a ghost vertex 
+     * to its remote partition.
+     *
+     * @note This information is useful when allocating the message buffers
+     * before-hand on GPUs.
      *
      * @note For a remote vertex, a remote local offset is recorded associated
      * with the `partitionId`.
@@ -128,8 +141,11 @@ class Graph {
     /** Unique id of a subgraph. */
     PartitionId partitionId;
 
+    /** Number of the partition. */
+    PartitionId numParts;
+
     /** Constructor */
-    Graph() : partitionId(0) {}
+    Graph(): partitionId(0), numParts(1) {}
 
     /**
      * Returns the total vertex number in the graph.
@@ -178,6 +194,7 @@ class Graph {
      */
     void addEdgeTuple(EdgeTuple<ED> edgeTuple) {
         Edge<ED> outEdge(edgeTuple.dstId, edgeTuple.attr);
+        Edge<ED> inEdge(edgeTuple.srcId, edgeTuple.attr);
         bool srcExists = false;
         bool dstExists = false;
         // If the target node already exists, append the edge directly.
@@ -188,7 +205,7 @@ class Graph {
                 srcExists = true;
             }
             if (v.id == edgeTuple.dstId) {
-                //v.inEdges.push_back(inEdge);
+                v.inEdges.push_back(inEdge);
                 dstExists = true;
             }
         }
@@ -199,7 +216,7 @@ class Graph {
         }
         if (!dstExists) {
             Vertex<int, ED> newNode(edgeTuple.dstId, 0);
-            // newNode.inEdges.push_back(inEdge);
+            newNode.inEdges.push_back(inEdge);
             vertices.push_back(newNode);
         }
     }
@@ -313,18 +330,19 @@ class Graph {
      * @param numParts          Number of partitions
      * @return                  A vector of subgraphs
      */
-    std::vector< Graph<VD, ED> > partitionBy(const PartitionStrategy &partitionStrategy,
+    std::vector< Graph<VD, ED> > partitionBy(const PartitionStrategy &strategy,
         PartitionId numParts) const {
         auto subgraphs = std::vector<Graph<VD, ED>>(numParts);
         for (PartitionId i = 0; i < numParts; i++) {
             subgraphs[i].partitionId = i;
+            subgraphs[i].numParts = numParts;
         }
         for (auto v : vertices) {
-            PartitionId partitionId = partitionStrategy.getPartition(v.id, numParts);
+            PartitionId partitionId = strategy.getPartition(v.id, numParts);
             subgraphs[partitionId].vertices.push_back(v);
-            VertexId localOffset = subgraphs[partitionId].vertices.size()-1;
-            // For other partitions, treat `v` as an ghost one.
-            auto ghost = std::pair<PartitionId, VertexId>(partitionId, localOffset);
+            VertexId localId = subgraphs[partitionId].vertices.size()-1;
+            // For other partitions, treat the vertex as an ghost one.
+            auto ghost = std::pair<PartitionId, VertexId>(partitionId, localId);
             for (PartitionId i = 0; i < numParts; i++) {
                 if (i == partitionId) continue;
                 subgraphs[i].ghostVertices[v.id] = ghost;
@@ -336,13 +354,29 @@ class Graph {
     /**
      * Print the graph on the screen as the outgoing edges.
      */
-    void print(bool withAttr = false) const {
+    void printOutEdges(bool withAttr = false) const {
         for (auto v : vertices) {
             std::cout << "[" << v.id;
             if (withAttr) std::cout << ", " + v.attr;
             std::cout << "] ";
             for (auto e : v.outEdges) {
                 std::cout << " ->" << e.id;
+                if (withAttr) std::cout << ", " << e.attr;
+            }
+            std::cout << std::endl;
+        }
+    }
+
+    /**
+     * Print the graph on the screen as the outgoing edges.
+     */
+    void printInEdges(bool withAttr = false) const {
+        for (auto v : vertices) {
+            std::cout << "[" << v.id;
+            if (withAttr) std::cout << ", " + v.attr;
+            std::cout << "] ";
+            for (auto e : v.inEdges) {
+                std::cout << " <-" << e.id;
                 if (withAttr) std::cout << ", " << e.attr;
             }
             std::cout << std::endl;
@@ -388,7 +422,7 @@ class Graph {
 
  private:
     /** Return the percentage of the `n` nodes in the graph */
-    float vertexPercentage(size_t n) const {
+    inline float vertexPercentage(size_t n) const {
         return static_cast<float>(n) * 100.0 / nodes();
     }
 };

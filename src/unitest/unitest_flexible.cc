@@ -18,36 +18,39 @@
 void unitest_sort_and_shuffle(flex::Graph<int, int> &graph) {
     std::cout << "print Scatter after sort\n";
     graph.sortVerticesById();
-    graph.print();
+    graph.printOutEdges();
 
     std::cout << "print Scatter after shuffle\n";
     graph.shuffleVertices();
-    graph.print();
+    graph.printOutEdges();
 
     std::cout << "print Scatter after shuffleEdges\n";
     graph.shuffleEdges();
-    graph.print();
+    graph.printOutEdges();
 
     std::cout << "print Scatter after sortEdges\n";
     graph.sortEdgesById();
-    graph.print();
+    graph.printOutEdges();
 
     std::cout << "print Scatter after sort\n";
     graph.sortVerticesById();
-    graph.print();
+    graph.printOutEdges();
 }
 
 void unitest_random_paritition(const flex::Graph<int, int> &graph, int numPart) {
     std::cout << "\nBefore partitioning " << numPart << " parts\n";
-    graph.print();
+    graph.printOutEdges();
     graph.printGhostVertices();
+    graph.printInEdges();
+
     std::cout << "\npartition into " << numPart << " parts\n";
     RandomEdgeCut random;
     auto subgraphs = graph.partitionBy(random, numPart);
     for (int i = 0; i < numPart; i++) {
         std::cout << "\n****\n"<< "Partition: " << subgraphs[i].partitionId << std::endl;
-        subgraphs[i].print();
+        subgraphs[i].printOutEdges();
         subgraphs[i].printGhostVertices();
+        subgraphs[i].printInEdges();
     }
 }
 
@@ -65,12 +68,12 @@ int main(int argc, char ** argv) {
     std::cout << "edges:" << graph.edges() << std::endl;
     std::cout << "averageDegree:" << graph.averageDegree() << std::endl;
     std::cout << "print\n";
-    graph.print();
-    graph.printGhostVertices(); // Supposed to print empty
+    graph.printOutEdges();
+    graph.printGhostVertices();  // Supposed to print empty
+    graph.printInEdges();
 
     // Sort and shuffle vertices and edges
-    //unitest_sort_and_shuffle(graph);
-
+    // unitest_sort_and_shuffle(graph);
 
     // Shuffle!
     graph.shuffleVertices();

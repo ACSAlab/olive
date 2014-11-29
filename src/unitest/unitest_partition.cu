@@ -39,7 +39,7 @@ int main(int argc, char ** argv) {
     flex::Graph<int, int> graph;
     PartitionId numParts = atoi(argv[2]);
     graph.fromEdgeListFile(argv[1]);
-    graph.print();
+    graph.printOutEdges();
     graph.printGhostVertices();
 
 
@@ -47,7 +47,7 @@ int main(int argc, char ** argv) {
     auto subgraphs = graph.partitionBy(random, numParts);
     for (int i = 0; i < numParts; i++) {
         std::cout << "\n****\n"<< "Partition: " << subgraphs[i].partitionId << std::endl;
-        subgraphs[i].print();
+        subgraphs[i].printOutEdges();
         subgraphs[i].printGhostVertices();
     }
 
