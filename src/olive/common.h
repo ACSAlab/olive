@@ -20,14 +20,9 @@
 #include <inttypes.h>
 
 
-<<<<<<< HEAD
 
 /**
- * A wrapper that asserts the success of cuda calls
-=======
-/**
  * A wrapper that asserts the success of CUDA calls
->>>>>>> FETCH_HEAD
  * TODO(onesuper): replace it with a method which throws an exception
  * 
  */
@@ -35,11 +30,7 @@
     do {                                                                \
         cudaError_t err = cuda_call;                                    \
         if (err != cudaSuccess) {                                       \
-<<<<<<< HEAD
-        fprintf(stderr, "Cuda Error in file '%s' in line %i : %s.\n",   \
-=======
         fprintf(stderr, "CUDA Error in file '%s' in line %i : %s.\n",   \
->>>>>>> FETCH_HEAD
                 __FILE__, __LINE__, cudaGetErrorString(err));           \
         assert(false);                                                  \
         }                                                               \
@@ -62,7 +53,6 @@ typedef uint32_t EdgeId;
 typedef uint32_t PartitionId;
 
 
-<<<<<<< HEAD
 /** Generic success and failure */
 typedef enum {
     SUCCESS = 0,
@@ -81,8 +71,5 @@ typedef enum {
     GPU_ONLY,       // Normal CUDA allocations
 } MemoryLevel;
 
-
-=======
->>>>>>> FETCH_HEAD
 
 #endif  // COMMON_H
