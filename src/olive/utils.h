@@ -1,5 +1,5 @@
 /**
- * Utils
+ * Utils.
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-10-20
@@ -17,6 +17,27 @@
 
 namespace util {
 
+/**
+ * Calculates the block number to launch a kernel by specifying 
+ * the thread number to fulfill the job and per-block thread number.
+ *
+ * The block number is redundant and can not exceed the limits
+ * which is defined by the architecture.
+ * 
+ * @param  threads         How many threads is requires
+ * @param  threadsPerBlock How many threads in each block (256 by default)
+ * @return                 The block number
+ */
+int getBlockNum(int threads,
+    int threadsPerBlock = DEFAULT_THREADS_PER_BLOCK) {
+    assert(threads > 0);
+    assert(threads <= MAX_THREADS);
+    int blocks =  threads % threadsPerBlock == 0 ?
+        threads / threadsPerBlock :
+        threads / threadsPerBlock + 1;
+    if (blocks > MAX_BLOCKS) blocks = MAX_BLOCKS;
+    return blocks;
+}
 
 /**
  * Enable all-to-all peer access
