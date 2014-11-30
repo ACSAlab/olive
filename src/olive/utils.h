@@ -22,7 +22,7 @@ namespace util {
  * Enable all-to-all peer access
  * TODO(onesuper): Temporarily making the following functions a part of utilities.
  */
-void enableAllPeerAccess(void) {
+void enableAllPeerAccess() {
     int numGpus = 0;
     CUDA_CHECK(cudaGetDeviceCount(&numGpus));
     for (int i = 0; i < numGpus; i++) {
@@ -40,7 +40,7 @@ void enableAllPeerAccess(void) {
     }
 }
 
-void disableAllPeerAccess(void) {
+void disableAllPeerAccess() {
     int numGpus = 0;
     CUDA_CHECK(cudaGetDeviceCount(&numGpus));
     for (int i = 0; i < numGpus; i++) {
@@ -88,7 +88,7 @@ size_t hashCode(size_t a) {
 }
 
 /** Get current time in milliseconds */
-double currentTimeMillis(void) {
+double currentTimeMillis() {
     timeval t;
     gettimeofday(&t, NULL);
     double millis = static_cast<double> (t.tv_sec * 1000.0);
@@ -97,7 +97,7 @@ double currentTimeMillis(void) {
 }
 
 /** Get current time in milliseconds */
-double currentTimeSeconds(void) {
+double currentTimeSeconds() {
     timeval t;
     gettimeofday(&t, NULL);
     double seconds = static_cast<double> (t.tv_sec);

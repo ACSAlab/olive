@@ -17,7 +17,8 @@
 #include "grd.h"
 #include "flexible.h"
 #include "utils.h"
-
+#include "logging.h"
+#include "message_box.h"
 
 /**
  * Managing the resource for each GPU-resident graph partition.
@@ -44,24 +45,17 @@ class Partition {
      public:
         PartitionId  partitionId;
         VertexId     id;
-        explicit Vertex(PartitionId pid, VertexId id_) : partitionId(pid), id(id_) {}
-    };
-
-    /**
-     * Stub information sending to a remote vertex.
-     * @note `id` here is .
-     */
-    class VertexMessage {
-     public:
-        VertexId  id;
-        void *    message;
+        explicit Vertex(PartitionId pid, VertexId id_): partitionId(pid), id(id_) {}
     };
 
     /** Partition identification. Obtained via a pass-in subgraph */
     PartitionId    partitionId;
 
+    /** Number of partitions. Obtained via a pass-in subgraph */
+    PartitionId    numParts;
+
     /** The device this partition binds to */
-    PartitionId    deviceId;
+    int            deviceId;
 
     /**
      * Stores the starting indices for querying outgoing edges of local vertices 
@@ -94,23 +88,20 @@ class Partition {
     GRD<VertexId>  globalIds;
 
     /**
-     * The messages sending to remote vertices are organized as hash tables.
-     *
-     * TODO: using a double-buffering method.
+     * Messages sending to remote vertices are inserted into corresponding 
+     * `outboxes`. The number of outboxes is equal to the number of partitions
+     * in the graph, which is got in runtime.
+     * If the vertex is in remote partition, then a message is inserted into
+     * the corresponding outbox. For the convenience, there is an empty outbox
+     * reserved for the local partition (do not allocate memory).
+     * e.g. for partition 2, outboxes[0/1/3] is effective.
      */
-    std::vector< GRD<VertexMessage> > outboxes;
+    MessageBox    * outboxes;
 
     /**
      * Messages received from remote vertices.
      */
-    std::vector< GRD<VertexMessage> > inboxes;
-
-    /**
-     * Send message 
-     * @param other The counterpart
-     */
-    //void send(Partition &other) {}
-
+    MessageBox    * inboxes;
 
     /**
      * Enables overlapped communication and computation.
@@ -125,43 +116,35 @@ class Partition {
     cudaEvent_t     startEvent;
     cudaEvent_t     endEvent;
 
-    // void initialize(void) {
-    //     CALL_SAFE(cudaSetDevice(deviceId));
-    //     CALL_SAFE(cudaStreamCreate(&streams[0]));
-    //     CALL_SAFE(cudaStreamCreate(&streams[1]));
-    //     CALL_SAFE(cudaEventCreate(&startEvent));
-    //     CALL_SAFE(cudaEventCreate(&endEvent));
-    // }
-
-    // void finalize(void) {
-    //     CALL_SAFE(cudaSetDevice(deviceId));
-    //     CALL_SAFE(cudaStreamDestroy(streams[0]));
-    //     CALL_SAFE(cudaStreamDestroy(streams[1]));
-    //     CALL_SAFE(cudaEventDestroy(startEvent));
-    //     CALL_SAFE(cudaEventDestroy(endEvent));
-    // }
+    /** Constructor */
+    Partition(): partitionId(0), deviceId(0), numParts(1), outboxes(NULL), inboxes(NULL) {}
 
     /**
      * Initializing a partition from a subgraph in flexible representation. 
      * By default, the partition is bound to device 0.
-     *
+     * 
      * The subgraph marks the vertices with a global id. Records the original
      * ids in `globalIds`.
      * 
+     *
+     * TODO(onesuper): more complicated partition-to-device assignment.
      */
     void fromSubgraph(const flex::Graph<int, int> &subgraph) {
         partitionId = subgraph.partitionId;
-        deviceId = 0;
-        vertices.reserve(subgraph.nodes()+1);
-        edges.reserve(subgraph.edges());
-        globalIds.reserve(subgraph.nodes());
-        // Building up the `globalIds` and a routing table which maps the global 
+        numParts = subgraph.numParts;
+        deviceId = partitionId % 2;
+        vertices.reserve(subgraph.nodes()+1, deviceId);
+        if (subgraph.edges() > 0)
+            edges.reserve(subgraph.edges(), deviceId);
+        if (subgraph.nodes() > 0)
+            globalIds.reserve(subgraph.nodes(), deviceId);
+        // Building up the `globalIds` and a routing table which maps the global
         // id to local.
-        std::map<VertexId, VertexId> routingToLocal;
+        std::map<VertexId, VertexId> toLocal;
         VertexId localId = 0;
         for (auto v : subgraph.vertices) {
             globalIds[localId++] = v.id;
-            routingToLocal.insert(std::pair<VertexId, VertexId>(v.id, localId));
+            toLocal.insert(std::pair<VertexId, VertexId>(v.id, localId));
         }
         VertexId vertexCount = 0;
         EdgeId   edgeCount   = 0;
@@ -169,20 +152,107 @@ class Partition {
             vertices[vertexCount++] = edgeCount;
             for (auto e : v.outEdges) {
                 if (subgraph.hasVertex(e.id)) {  // In this partition
-                    edges[edgeCount++] = Vertex(partitionId, routingToLocal[e.id]);
+                    edges[edgeCount++] = Vertex(partitionId, toLocal[e.id]);
                 } else {                         // In remote partition
                     auto it = subgraph.ghostVertices.find(e.id);
                     assert(it != subgraph.ghostVertices.end());
-                    edges[edgeCount++] = Vertex(it->second.first, it->second.second);
+                    edges[edgeCount++] = Vertex(it->second.first,
+                                                it->second.second);
                 }
             }
         }
         vertices[vertexCount] = edgeCount;
         assert(vertexCount == subgraph.nodes());
         assert(edgeCount == subgraph.edges());
+        vertices.cache();
+        edges.cache();
+        globalIds.cache();
+        initMessageBoxes(subgraph);
+        CUDA_CHECK(cudaSetDevice(deviceId));
+        CUDA_CHECK(cudaStreamCreate(&streams[0]));
+        CUDA_CHECK(cudaStreamCreate(&streams[1]));
+        CUDA_CHECK(cudaEventCreate(&startEvent));
+        CUDA_CHECK(cudaEventCreate(&endEvent));
+    }
+
+    /** Destructor **/
+    ~Partition() {
+        if (outboxes) delete[] outboxes;
+        if (inboxes)  delete[] inboxes;
+        CUDA_CHECK(cudaSetDevice(deviceId));
+        CUDA_CHECK(cudaStreamDestroy(streams[0]));
+        CUDA_CHECK(cudaStreamDestroy(streams[1]));
+        CUDA_CHECK(cudaEventDestroy(startEvent));
+        CUDA_CHECK(cudaEventDestroy(endEvent));
+    }
+
+ private:
+    /**
+     * Initializing `outboxes` and `inboxes` according to the topological
+     * information of the subgraph, since we have to allocate memory before-hand
+     * on GPUs.
+     *
+     * The size of `outbox` for a partition is equal to the number of those
+     * outgoing edges connecting to this remote partition. And the size of
+     * `inbox` for a partition is equal to the number of those incoming edges
+     * coming from this remote partition.
+     *
+     * The message boxes is allocated at the maximum size when every vertex 
+     * wants to send a message to its remote neighbors.
+     *
+     * @note Duplication is allowed when counting incoming/outgoing edges, since
+     * it is possible that more than one vertex in local partition send messages
+     * to the same remote vertex.
+     */
+    void initMessageBoxes(const flex::Graph<int, int> &subgraph) {
+        int * outgoingEdges = new int[numParts]();
+        int * incomingEdges = new int[numParts]();
+        outboxes = new MessageBox[numParts];
+        inboxes = new MessageBox[numParts];
+
+        for (auto v : subgraph.vertices) {
+            for (auto e : v.outEdges) {
+                if (!subgraph.hasVertex(e.id)) {
+                    auto it = subgraph.ghostVertices.find(e.id);
+                    assert(it != subgraph.ghostVertices.end());
+                    PartitionId parTo = it->second.first;
+                    assert(parTo < numParts);
+                    outgoingEdges[parTo]++;
+                }
+            }
+            for (auto e : v.inEdges) {
+                if (!subgraph.hasVertex(e.id)) {
+                    auto it = subgraph.ghostVertices.find(e.id);
+                    assert(it != subgraph.ghostVertices.end());
+                    PartitionId parFrom = it->second.first;
+                    assert(parFrom < numParts);
+                    incomingEdges[parFrom]++;
+                }
+            }
+        }
+
+        // std::cout << "\noutgoingEdges: ";
+        // for (PartitionId i = 0; i < numParts; i++) {
+        //     std::cout << outgoingEdges[i] << " ";
+        // }
+        // std::cout << "\nincomingEdges: ";
+        // for (PartitionId i = 0; i < numParts; i++) {
+        //     std::cout << incomingEdges[i] << " ";
+        // }
+
+        assert(outgoingEdges[partitionId] == 0);
+        assert(incomingEdges[partitionId] == 0);
+
+        for (PartitionId i = 0; i < numParts; i++) {
+            if (i == partitionId) continue;
+            if (outgoingEdges[i] > 0)
+                outboxes[i].reserve(outgoingEdges[i], deviceId);
+            if (incomingEdges[i] > 0)
+                inboxes[i].reserve(incomingEdges[i], deviceId);
+        }
+        delete[] outgoingEdges;
+        delete[] incomingEdges;
     }
 };
 
-
-
-#endif  // PARTITION_H 
+#endif  // PARTITION_H

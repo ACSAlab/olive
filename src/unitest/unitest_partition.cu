@@ -13,6 +13,10 @@
 #include <iostream>
 
 void print_paritition(const Partition& partition) {
+
+    std::cout << "\n****\n"<< "Partition: " << partition.partitionId
+        << "/" << partition.numParts << std::endl;
+
     printf("\nvertices: ");
     for (size_t i = 0 ; i < partition.vertices.size(); i++) {
         std::cout << partition.vertices[i] << " "; 
@@ -39,21 +43,22 @@ int main(int argc, char ** argv) {
     flex::Graph<int, int> graph;
     PartitionId numParts = atoi(argv[2]);
     graph.fromEdgeListFile(argv[1]);
-    graph.print();
+    graph.printOutEdges();
     graph.printGhostVertices();
 
 
     RandomEdgeCut random;
     auto subgraphs = graph.partitionBy(random, numParts);
     for (int i = 0; i < numParts; i++) {
-        std::cout << "\n****\n"<< "Partition: " << subgraphs[i].partitionId << std::endl;
-        subgraphs[i].print();
+        std::cout << "\n****\n"<< "Subgraph: " << subgraphs[i].partitionId
+            << "/" << subgraphs[i].numParts << std::endl;
+        subgraphs[i].printOutEdges();
         subgraphs[i].printGhostVertices();
+        subgraphs[i].printInEdges();
     }
 
     Partition par[4];
     for (int i = 0; i < numParts; i++) {
-        std::cout << "\n****\n"<< "Partition: " << subgraphs[i].partitionId << std::endl;
         par[i].fromSubgraph(subgraphs[i]);
         print_paritition(par[i]);
     }

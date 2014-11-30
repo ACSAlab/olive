@@ -23,7 +23,7 @@ class Bitmap {
     int numWords;
 
  public:
-    Bitmap(void) {
+    Bitmap() {
         numWords = 0;
         words = NULL;
     }
@@ -38,12 +38,12 @@ class Bitmap {
         words = new Word[numWords]();
     }
 
-    ~Bitmap(void) {
+    ~Bitmap() {
         delete[] words;
     }
 
     /** Get the capacity (number of bits) contained in this bitmap */
-    int capacity(void) const {
+    int capacity() const {
         return numWords << 6;
     }
 

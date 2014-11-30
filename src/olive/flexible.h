@@ -26,7 +26,9 @@ namespace flex {
 /**
  * Directed edge structure for flexible graph representation. 
  * Each edge contains an `id` standing for either its destination or its source,
- * and its associated attribute.
+ * and its associated attribute. For an outgoing edge, `id` is the destination.
+ * While for an incoming edge, `id` is the source. 
+ * 
  *
  * @tparam ED the edge attribute type
  */
@@ -63,6 +65,15 @@ template<typename VD, typename ED>
 class Vertex {
  public:
     std::vector< Edge<ED> > outEdges;
+
+    /**
+     * Storing only outEdges is sufficient to express the topology of a graph.
+     * However, keeping this information is useful when allocating the message
+     * buffers before-hand on GPUs.
+     */
+    std::vector< Edge<ED> > inEdges;
+
+
     VertexId    id;
     VD          attr;
 
@@ -81,17 +92,17 @@ class Vertex {
     }
 
     /** Returns the out-degree of this node. */
-    size_t outdegree(void) const {
+    size_t outdegree() const {
         return outEdges.size();
     }
 
     /** Shuffles the outgoing edges. */
-    void shuffleEdges(void) {
+    void shuffleEdges() {
         std::random_shuffle(outEdges.begin(), outEdges.end());
     }
 
     /** Sorts the outgoing edges according to their destination. */
-    void sortEdgesById(void) {
+    void sortEdgesById() {
         std::stable_sort(outEdges.begin(), outEdges.end());
     }
 
@@ -114,11 +125,15 @@ class Graph {
     std::vector< Vertex<VD, ED> > vertices;
 
     /**
-     * Some vertices are missing from a partitioned subgraph.
-     * Records the `partitionId` for those missing vertices.
+     * Some vertices are missing from a partitioned subgraph. Records the
+     * `partitionId` and the local id for those missing vertices.
      * The ghost vertices are stored as key-value pairs, where the key is the
      * global id and the value is a (partitionId, localId) pair.
-     * It can be used to ship a vertex to its remote partition.
+     * It can be used to establish a routing table which ships a ghost vertex 
+     * to its remote partition.
+     *
+     * @note This information is useful when allocating the message buffers
+     * before-hand on GPUs.
      *
      * @note For a remote vertex, a remote local offset is recorded associated
      * with the `partitionId`.
@@ -128,20 +143,23 @@ class Graph {
     /** Unique id of a subgraph. */
     PartitionId partitionId;
 
+    /** Number of the partition. */
+    PartitionId numParts;
+
     /** Constructor */
-    Graph() : partitionId(0) {}
+    Graph(): partitionId(0), numParts(1) {}
 
     /**
      * Returns the total vertex number in the graph.
      */
-    size_t nodes(void) const {
+    size_t nodes() const {
         return vertices.size();
     }
 
     /** 
      * Returns the total edge number in the graph.
      */
-    size_t edges(void) const {
+    size_t edges() const {
         size_t sum = 0;
         for (auto v : vertices) {
             sum += v.outdegree();
@@ -152,7 +170,7 @@ class Graph {
     /** 
      * Returns the average degree of the graph in floating number.
      */
-    float averageDegree(void) const {
+    float averageDegree() const {
         return static_cast<float>(edges()) / nodes();
     }
 
@@ -178,18 +196,29 @@ class Graph {
      */
     void addEdgeTuple(EdgeTuple<ED> edgeTuple) {
         Edge<ED> outEdge(edgeTuple.dstId, edgeTuple.attr);
+        Edge<ED> inEdge(edgeTuple.srcId, edgeTuple.attr);
         bool srcExists = false;
+        bool dstExists = false;
         // If the target node already exists, append the edge directly.
         for (auto& v : vertices) {
+            if (srcExists && dstExists) break;
             if (v.id == edgeTuple.srcId) {
                 v.outEdges.push_back(outEdge);
                 srcExists = true;
-                break;
+            }
+            if (v.id == edgeTuple.dstId) {
+                v.inEdges.push_back(inEdge);
+                dstExists = true;
             }
         }
         if (!srcExists) {
             Vertex<int, ED> newNode(edgeTuple.srcId, 0);
             newNode.outEdges.push_back(outEdge);
+            vertices.push_back(newNode);
+        }
+        if (!dstExists) {
+            Vertex<int, ED> newNode(edgeTuple.dstId, 0);
+            newNode.inEdges.push_back(inEdge);
             vertices.push_back(newNode);
         }
     }
@@ -204,7 +233,7 @@ class Graph {
      * ...
      * }}}
      */
-     void printDegreeDist(void) {
+     void printDegreeDist() {
         size_t outDegreeLog[32];
         int slotMax = 0;
         for (int i = 0; i < 32; i++) {
@@ -303,18 +332,19 @@ class Graph {
      * @param numParts          Number of partitions
      * @return                  A vector of subgraphs
      */
-    std::vector< Graph<VD, ED> > partitionBy(const PartitionStrategy &partitionStrategy,
+    std::vector< Graph<VD, ED> > partitionBy(const PartitionStrategy &strategy,
         PartitionId numParts) const {
         auto subgraphs = std::vector<Graph<VD, ED>>(numParts);
         for (PartitionId i = 0; i < numParts; i++) {
             subgraphs[i].partitionId = i;
+            subgraphs[i].numParts = numParts;
         }
         for (auto v : vertices) {
-            PartitionId partitionId = partitionStrategy.getPartition(v.id, numParts);
+            PartitionId partitionId = strategy.getPartition(v.id, numParts);
             subgraphs[partitionId].vertices.push_back(v);
-            VertexId localOffset = subgraphs[partitionId].vertices.size()-1;
-            // For other partitions, treat `v` as an ghost one.
-            auto ghost = std::pair<PartitionId, VertexId>(partitionId, localOffset);
+            VertexId localId = subgraphs[partitionId].vertices.size()-1;
+            // For other partitions, treat the vertex as an ghost one.
+            auto ghost = std::pair<PartitionId, VertexId>(partitionId, localId);
             for (PartitionId i = 0; i < numParts; i++) {
                 if (i == partitionId) continue;
                 subgraphs[i].ghostVertices[v.id] = ghost;
@@ -326,7 +356,7 @@ class Graph {
     /**
      * Print the graph on the screen as the outgoing edges.
      */
-    void print(bool withAttr = false) const {
+    void printOutEdges(bool withAttr = false) const {
         for (auto v : vertices) {
             std::cout << "[" << v.id;
             if (withAttr) std::cout << ", " + v.attr;
@@ -340,9 +370,25 @@ class Graph {
     }
 
     /**
+     * Print the graph on the screen as the outgoing edges.
+     */
+    void printInEdges(bool withAttr = false) const {
+        for (auto v : vertices) {
+            std::cout << "[" << v.id;
+            if (withAttr) std::cout << ", " + v.attr;
+            std::cout << "] ";
+            for (auto e : v.inEdges) {
+                std::cout << " <-" << e.id;
+                if (withAttr) std::cout << ", " << e.attr;
+            }
+            std::cout << std::endl;
+        }
+    }
+
+    /**
      * Print the ghost vertices on the screen (for subgraphs).
      */
-    void printGhostVertices(void) const {
+    void printGhostVertices() const {
         std::cout << "ghost: {";
         for (auto g : ghostVertices) {
             std::cout << g.first << ": <" << g.second.first << ", "
@@ -352,24 +398,24 @@ class Graph {
     }
 
     /** Shuffles the vertices. */
-    void shuffleVertices(void) {
+    void shuffleVertices() {
         std::random_shuffle(vertices.begin(), vertices.end());
     }
 
     /** Sorts the vertices by id. */
-    void sortVerticesById(void) {
+    void sortVerticesById() {
         std::stable_sort(vertices.begin(), vertices.end());
     }
 
     /** Shuffles the edges. */
-    void shuffleEdges(void) {
+    void shuffleEdges() {
         for (auto& v : vertices) {
             v.shuffleEdges();
         }
     }
 
     /** Sorts the edges by id. */
-    void sortEdgesById(void) {
+    void sortEdgesById() {
         for (auto& v : vertices) {
             v.sortEdgesById();
         }
@@ -378,7 +424,7 @@ class Graph {
 
  private:
     /** Return the percentage of the `n` nodes in the graph */
-    float vertexPercentage(size_t n) const {
+    inline float vertexPercentage(size_t n) const {
         return static_cast<float>(n) * 100.0 / nodes();
     }
 };
