@@ -35,8 +35,13 @@ LIB_DIR      = $(BUILD_DIR)/lib
 #-------------------------------------------------------------------------------
 CC = g++
 NVCC = "$(shell which nvcc)"
+<<<<<<< HEAD
 NVCCFLAGS = -g
 CCFLAGS = -Wall -g -gdwarf-3 -std=c++11
+=======
+NVCCFLAGS = -g -std=c++11
+CCFLAGS = -Wall -g -std=c++11
+>>>>>>> FETCH_HEAD
 
 
 #-------------------------------------------------------------------------------
@@ -83,6 +88,7 @@ INC = -I$(OLIVE_DIR)
 #-------------------------------------------------------------------------------
 # Generates the name lists for building
 #-------------------------------------------------------------------------------
+<<<<<<< HEAD
 CUSRC  = $(wildcard $(OLIVE_DIR)/*.cu)
 CUOBJ  = $(patsubst $(OLIVE_DIR)/%.cu, $(OBJ_DIR)/%.cu.o, $(CUSRC))
 CCSRC  = $(wildcard $(OLIVE_DIR)/*.cc)
@@ -90,6 +96,17 @@ CUOBJ  = $(patsubst $(OLIVE_DIR)/%.cc, $(OBJ_DIR)/%.cc.o, $(CCSRC))
 UTSRC  = $(wildcard $(UTEST_DIR)/*.cc)
 UTEXE  = $(patsubst $(UTEST_DIR)/%.cc, $(BIN_DIR)/%, $(UTSRC))
 DEPS   = $(wildcard $(OLIVE_DIR)/*.h)
+=======
+CUSRC   = $(wildcard $(OLIVE_DIR)/*.cu)
+CUOBJ   = $(patsubst $(OLIVE_DIR)/%.cu, $(OBJ_DIR)/%.cu.o, $(CUSRC))
+CCSRC   = $(wildcard $(OLIVE_DIR)/*.cc)
+CUOBJ   = $(patsubst $(OLIVE_DIR)/%.cc, $(OBJ_DIR)/%.cc.o, $(CCSRC))
+UTSRC   = $(wildcard $(UTEST_DIR)/*.cc)
+UTEXE   = $(patsubst $(UTEST_DIR)/%.cc, $(BIN_DIR)/%, $(UTSRC))
+UTCUSRC = $(wildcard $(UTEST_DIR)/*.cu)
+UTCUEXE = $(patsubst $(UTEST_DIR)/%.cu, $(BIN_DIR)/%, $(UTCUSRC))
+DEPS    = $(wildcard $(OLIVE_DIR)/*.h)
+>>>>>>> FETCH_HEAD
 
 
 #-------------------------------------------------------------------------------
@@ -125,12 +142,24 @@ $(CCOBJ): $(OBJ_DIR)/%.cc.o: $(OLIVE_DIR)/%.cc $(DEPS)
 #-------------------------------------------------------------------------------
 # Rules for unitest (unitest/%.cc => bin/%)
 #-------------------------------------------------------------------------------
+<<<<<<< HEAD
 unitests: $(BIN_DIR) $(UTEXE) 
 
 $(UTEXE): $(BIN_DIR)/%: $(UTEST_DIR)/%.cc $(DEPS) 
 	@echo "Building unitest executable: "$@	
 	@$(CC) -o $@ $< $(CCFLAGS) $(INC)
 
+=======
+unitests: $(BIN_DIR) $(UTEXE) $(UTCUEXE) 
+
+$(UTEXE): $(BIN_DIR)/%: $(UTEST_DIR)/%.cc $(DEPS) 
+	@echo "Building unitest executable: "$@	
+	@$(CC) -o $@ $< $(CCFLAGS) $(INC)
+
+$(UTCUEXE): $(BIN_DIR)/%: $(UTEST_DIR)/%.cu $(DEPS) 
+	@echo "Building CUDA unitest executable: "$@	
+	@$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC)
+>>>>>>> FETCH_HEAD
 
 #-------------------------------------------------------------------------------
 # Rules for BFS

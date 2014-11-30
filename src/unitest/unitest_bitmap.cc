@@ -8,13 +8,13 @@
  * Last Modified: 2014-11-14
  */
 
-
+/**/
 #include <iostream>
 #include <algorithm>
 
 #include "bitmap.h"
 
-
+/**/
 #define DEBUG(a) std::cout <<"\033[31;1m" <<a <<"\033[0m"
 #define MAXLEN 512
 
@@ -54,7 +54,7 @@ void unitest_bitmap_operations(void) {
     assert(bitmap_equal_array(bitmap1, binary_array1, length1));
     printf("set bitmap1\n");
 
-
+/**/
     // Randomly set half elements of bitmap2 and bit_array2 to 1
     for (int i = 0; i < length2/2; i++) {
         int position = get_rand(length2);
@@ -65,13 +65,13 @@ void unitest_bitmap_operations(void) {
     assert(bitmap_equal_array(bitmap2, binary_array2, length2));
     printf("set bitmap2\n");
 
-
+/**/
     int min = std::min(length1, length2);
     int max = std::max(length1, length2);
     Bitmap b;
     bool * a = new bool[max]();
 
-
+/**/
     // &
     b = bitmap1 & bitmap2;
     for (int i = 0; i < min; i++) {
@@ -94,7 +94,7 @@ void unitest_bitmap_operations(void) {
     assert(bitmap_equal_array(b, a, max));
     printf("or pass\n");
 
-
+/**/
     // ^
     b = bitmap1 ^ bitmap2;
     for (int i = 0; i < min; i++) {

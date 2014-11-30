@@ -19,11 +19,19 @@
 template<typename ED>
 class EdgeTuple {
  public:
+<<<<<<< HEAD
     VertexId srcId;     // The vertex id of the source vertex
     VertexId dstId;     // The vertex id of the target vertex
     ED attr;            // The attribute associated with the edge
 
     /** Construtor with all three parameters */
+=======
+    VertexId srcId;     /** The vertex id of the source vertex */
+    VertexId dstId;     /** The vertex id of the target vertex */
+    ED attr;            /** The attribute associated with the edge */
+
+    /** Constructor with all three parameters */
+>>>>>>> FETCH_HEAD
     explicit EdgeTuple(VertexId src, VertexId dst, ED d) {
         srcId = src;
         dstId = dst;

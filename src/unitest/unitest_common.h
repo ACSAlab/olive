@@ -8,4 +8,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+<<<<<<< HEAD
 #include <time.h>
+=======
+#include <time.h>
+
+>>>>>>> FETCH_HEAD

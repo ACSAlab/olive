@@ -1,5 +1,5 @@
 /**
- * A simple bitset implementation
+ * A simple bit set implementation
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-11-05
@@ -18,6 +18,7 @@
  * A simple bitmap implementation. No bound checking so it is fast.
  */
 class Bitmap {
+ private:
     Word * words;
     int numWords;
 
