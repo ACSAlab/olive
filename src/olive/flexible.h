@@ -39,10 +39,7 @@ class Edge {
     ED       attr;
 
     /** Constructor */
-    explicit Edge(VertexId id_, ED d) {
-        id = id_;
-        attr = d;
-    }
+    explicit Edge(VertexId id_, ED d): id(id_), attr(d) {}
 
     /** For sorting the outgoing edges of a certain vertex */
     friend bool operator< (Edge a, Edge b) {
@@ -64,17 +61,18 @@ class Edge {
 template<typename VD, typename ED>
 class Vertex {
  public:
-    std::vector< Edge<ED> > outEdges;
-
     /**
      * Storing only outEdges is sufficient to express the topology of a graph.
      * However, keeping this information is useful when allocating the message
      * buffers before-hand on GPUs.
      */
+    std::vector< Edge<ED> > outEdges;
     std::vector< Edge<ED> > inEdges;
 
-
+    /** The unique (global) id for vertex. */
     VertexId    id;
+
+    /** Vertex-wise attribute. */
     VD          attr;
 
     /** Constructor */
@@ -177,7 +175,7 @@ class Graph {
     /**
      * Check the existence of a vertex by specifying its `id`.
      *
-     * @param  id The id to look up
+     * @param  id   The id to look up
      * @return True if it exists
      */
     bool hasVertex(VertexId id) const {

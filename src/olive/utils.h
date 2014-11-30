@@ -9,9 +9,10 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-
 #include <sys/time.h>
+#include <utility>
 
+#include "cuda_runtime.h"
 #include "common.h"
 #include "logging.h"
 
@@ -26,17 +27,18 @@ namespace util {
  * 
  * @param  threads         How many threads is requires
  * @param  threadsPerBlock How many threads in each block (256 by default)
- * @return                 The block number
+ * @return                 A pair (block number, thread number per block)
  */
-int getBlockNum(int threads,
+std::pair<int, int> kernelConfig(int threads,
     int threadsPerBlock = DEFAULT_THREADS_PER_BLOCK) {
     assert(threads > 0);
     assert(threads <= MAX_THREADS);
+    if (threads < threadsPerBlock) threadsPerBlock = threads;
     int blocks =  threads % threadsPerBlock == 0 ?
         threads / threadsPerBlock :
         threads / threadsPerBlock + 1;
     if (blocks > MAX_BLOCKS) blocks = MAX_BLOCKS;
-    return blocks;
+    return std::make_pair(blocks, threadsPerBlock);
 }
 
 /**
@@ -46,6 +48,7 @@ int getBlockNum(int threads,
 void enableAllPeerAccess() {
     int numGpus = 0;
     CUDA_CHECK(cudaGetDeviceCount(&numGpus));
+    LOG(INFO) << numGpus << " GPU detected";
     for (int i = 0; i < numGpus; i++) {
         for (int j = i+1; j < numGpus; j++) {
             CUDA_CHECK(cudaSetDevice(i));
@@ -64,13 +67,14 @@ void enableAllPeerAccess() {
 void disableAllPeerAccess() {
     int numGpus = 0;
     CUDA_CHECK(cudaGetDeviceCount(&numGpus));
+    LOG(INFO) << numGpus << " GPU detected";
     for (int i = 0; i < numGpus; i++) {
         for (int j = i+1; j < numGpus; j++) {
             CUDA_CHECK(cudaSetDevice(i));
             int canAccess = 0;
             CUDA_CHECK(cudaDeviceCanAccessPeer(&canAccess, i, j));
             if (canAccess == 1) {
-                CUDA_CHECK(cudaDeviceDisablePeerAccess(j, 0));
+                CUDA_CHECK(cudaDeviceDisablePeerAccess(j));
                 LOG(INFO) << i << " disable peer access " << j;
             } else {
                 LOG(WARNING) << i << " cannot access peer " << j;

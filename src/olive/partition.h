@@ -31,7 +31,7 @@
  * the other partition.
  * 
  * @note The original vertex id in original graph is mapped to a new local id
- * in a graph partition. e.g. The ids are continuous from 0 to len(`vertices`)-1;
+ * in a graph partition. e.g. The ids are continuous from 0 to `vertices`-1;
  *
  */
 class Partition {
@@ -44,7 +44,10 @@ class Partition {
      public:
         PartitionId  partitionId;
         VertexId     id;
-        explicit Vertex(PartitionId pid, VertexId id_): partitionId(pid), id(id_) {}
+        explicit Vertex(PartitionId pid, VertexId id_) {
+            partitionId = pid;
+            id = id_;
+        }
     };
 
     /**
@@ -126,7 +129,8 @@ class Partition {
     cudaEvent_t     endEvent;
 
     /** Constructor */
-    Partition(): partitionId(0), deviceId(0), numParts(1), outboxes(NULL), inboxes(NULL) {}
+    Partition(): partitionId(0), deviceId(0), numParts(1),
+        outboxes(NULL), inboxes(NULL) {}
 
     /**
      * Initializing a partition from a subgraph in flexible representation. 

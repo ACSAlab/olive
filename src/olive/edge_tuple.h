@@ -13,7 +13,7 @@
 
 /**
  *  An edge is ternary tuple (`srcId`, `dstId`, `attr`).
- * 
+ *
  * @tparam ED type of the edge attribute
  */
 template<typename ED>

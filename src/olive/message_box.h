@@ -1,5 +1,5 @@
 /**
- * Message box contains the 
+ * Message box contains the
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-11-28
@@ -9,7 +9,7 @@
 #ifndef MESSAGE_BOX_H
 #define MESSAGE_BOX_H
 
-
+#include "common.h"
 
 /**
  * MessageBox does not utilize GRD since the buffer only lives on GPU.
@@ -36,11 +36,11 @@ class MessageBox {
 
     /** Allocating space for the message box */
     void reserve(size_t len, int id) {
+        assert(len > 0);
+        assert(id >= 0);
         maxLength = len;
         deviceId = id;
         length = 0;
-        assert(len > 0);
-        assert(id >= 0);
         CUDA_CHECK(cudaSetDevice(deviceId));
         CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **>(&buffers[0]),
                                   len * sizeof(MSG), cudaHostAllocPortable));
@@ -50,11 +50,11 @@ class MessageBox {
 
     /**
      * Copies the content of a remote message box to this.
-     * We use asynchronized memory copy to hide the memory latency with 
+     * We use asynchronized memory copy to hide the memory latency with
      * computation.
      *
      * Assuming the peer-to-peer access is already enabled.
-     * 
+     *
      * @param other   The message box to copy.
      * @stream stream The stream to perform this copy within.
      */
@@ -71,7 +71,7 @@ class MessageBox {
                                    stream));
     }
 
-    /** 
+    /**
      * Exchanges two buffers.
      */
     inline void exchange() {
