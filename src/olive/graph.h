@@ -1,5 +1,5 @@
 /**
- * Defines the interface for the graph
+ * Defines the interface for the graph.
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-11-02

@@ -1,11 +1,10 @@
 /**
- * Partition
+ * Partition.
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-11-13
  * Last Modified: 2014-11-13
  */
-
 
 #ifndef PARTITION_H
 #define PARTITION_H
@@ -46,6 +45,16 @@ class Partition {
         PartitionId  partitionId;
         VertexId     id;
         explicit Vertex(PartitionId pid, VertexId id_): partitionId(pid), id(id_) {}
+    };
+
+    /**
+     * Stub information sending to a remote vertex.
+     * @note `id` here is .
+     */
+    class Stub {
+     public:
+        VertexId  id;       /** Specifying the remote vertex by its local id. */
+        void *    message;  /** Content of the message. */
     };
 
     /** Partition identification. Obtained via a pass-in subgraph */
@@ -96,12 +105,12 @@ class Partition {
      * reserved for the local partition (do not allocate memory).
      * e.g. for partition 2, outboxes[0/1/3] is effective.
      */
-    MessageBox    * outboxes;
+    MessageBox<Stub> * outboxes;
 
     /**
      * Messages received from remote vertices.
      */
-    MessageBox    * inboxes;
+    MessageBox<Stub> * inboxes;
 
     /**
      * Enables overlapped communication and computation.
@@ -132,22 +141,21 @@ class Partition {
     void fromSubgraph(const flex::Graph<int, int> &subgraph) {
         partitionId = subgraph.partitionId;
         numParts = subgraph.numParts;
-        deviceId = partitionId % 2;
         vertices.reserve(subgraph.nodes()+1, deviceId);
         if (subgraph.edges() > 0)
             edges.reserve(subgraph.edges(), deviceId);
         if (subgraph.nodes() > 0)
             globalIds.reserve(subgraph.nodes(), deviceId);
-        // Building up the `globalIds` and a routing table which maps the global
-        // id to local.
+
+        // `toLocal` maps the global id to local. Used to create remote vertex.
         std::map<VertexId, VertexId> toLocal;
-        VertexId localId = 0;
+        VertexId localId     = 0;
+        VertexId vertexCount = 0;
+        EdgeId   edgeCount   = 0;
         for (auto v : subgraph.vertices) {
             globalIds[localId++] = v.id;
             toLocal.insert(std::pair<VertexId, VertexId>(v.id, localId));
         }
-        VertexId vertexCount = 0;
-        EdgeId   edgeCount   = 0;
         for (auto v : subgraph.vertices) {
             vertices[vertexCount++] = edgeCount;
             for (auto e : v.outEdges) {
@@ -162,12 +170,17 @@ class Partition {
             }
         }
         vertices[vertexCount] = edgeCount;
+        assert(localId == subgraph.nodes());
         assert(vertexCount == subgraph.nodes());
         assert(edgeCount == subgraph.edges());
         vertices.cache();
         edges.cache();
         globalIds.cache();
+
         initMessageBoxes(subgraph);
+
+        // Sets up the CUDA resources.
+        deviceId = partitionId % 2;
         CUDA_CHECK(cudaSetDevice(deviceId));
         CUDA_CHECK(cudaStreamCreate(&streams[0]));
         CUDA_CHECK(cudaStreamCreate(&streams[1]));
@@ -207,9 +220,8 @@ class Partition {
     void initMessageBoxes(const flex::Graph<int, int> &subgraph) {
         int * outgoingEdges = new int[numParts]();
         int * incomingEdges = new int[numParts]();
-        outboxes = new MessageBox[numParts];
-        inboxes = new MessageBox[numParts];
-
+        outboxes = new MessageBox<Stub>[numParts];
+        inboxes = new MessageBox<Stub>[numParts];
         for (auto v : subgraph.vertices) {
             for (auto e : v.outEdges) {
                 if (!subgraph.hasVertex(e.id)) {
@@ -230,19 +242,8 @@ class Partition {
                 }
             }
         }
-
-        // std::cout << "\noutgoingEdges: ";
-        // for (PartitionId i = 0; i < numParts; i++) {
-        //     std::cout << outgoingEdges[i] << " ";
-        // }
-        // std::cout << "\nincomingEdges: ";
-        // for (PartitionId i = 0; i < numParts; i++) {
-        //     std::cout << incomingEdges[i] << " ";
-        // }
-
         assert(outgoingEdges[partitionId] == 0);
         assert(incomingEdges[partitionId] == 0);
-
         for (PartitionId i = 0; i < numParts; i++) {
             if (i == partitionId) continue;
             if (outgoingEdges[i] > 0)

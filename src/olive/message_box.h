@@ -13,23 +13,18 @@
 
 /**
  * MessageBox does not utilize GRD since the buffer only lives on GPU.
+ * MessageBox uses host pinned memory, which is accessible by all CUDA contexts.
+ * Contexts communicates with each other via asynchronized peer-to-peer access.
+ *
+ * @tparam MSG The data type for message contained in the box.
  */
+template<typename MSG>
 class MessageBox {
  public:
-    /**
-     * Stub information sending to a remote vertex.
-     * @note `id` here is .
-     */
-    class Message {
-     public:
-        VertexId  id;        // Specifying the remote vertex by its local id.
-        void *    message;   // Content of the message.
-    };
-
-    Message * buffers[2];   /** Using a double-buffering method. */
+    MSG *     buffers[2];   /** Using a double-buffering method. */
     int       deviceId;     /** Where the message box locates */
     size_t    maxLength;    /** Maximum length of the buffer */
-    size_t    length;      /** Current capacity of the message box. */
+    size_t    length;       /** Current capacity of the message box. */
 
     /**
      * Constructor. `deviceId < 0` if there is no memory reserved
@@ -48,11 +43,9 @@ class MessageBox {
         assert(id >= 0);
         CUDA_CHECK(cudaSetDevice(deviceId));
         CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **>(&buffers[0]),
-                                  len * sizeof(Message),
-                                  cudaHostAllocPortable));
+                                  len * sizeof(MSG), cudaHostAllocPortable));
         CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **>(&buffers[1]),
-                                  len * sizeof(Message),
-                                  cudaHostAllocPortable));
+                                  len * sizeof(MSG), cudaHostAllocPortable));
     }
 
     /**
@@ -73,8 +66,9 @@ class MessageBox {
         CUDA_CHECK(cudaSetDevice(deviceId));
         CUDA_CHECK(cudaMemcpyAsync(buffers[0],
                                    other.buffers[0],
-                                   other.length * sizeof(Message),
-                                   cudaMemcpyDefault, stream));
+                                   other.length * sizeof(MSG),
+                                   cudaMemcpyDefault,
+                                   stream));
     }
 
     /** 
@@ -82,7 +76,7 @@ class MessageBox {
      */
     inline void exchange() {
         if (maxLength > 0) {
-            Message * temp = buffers[0];
+            MSG * temp = buffers[0];
             buffers[0] = buffers[1];
             buffers[1] = temp;
         }

@@ -1,5 +1,5 @@
 /**
- * GPU-resident Dataset
+ * GPU-resident Dataset.
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-11-13
@@ -85,7 +85,7 @@ class GRD {
      * Free both host- and device- resident buffers.
      */
     inline void del() {
-        if (elemsHost) 
+        if (elemsHost)
             free(elemsHost);
         if (elemsDevice) {
             CUDA_CHECK(cudaSetDevice(deviceId));

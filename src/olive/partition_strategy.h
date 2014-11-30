@@ -1,5 +1,5 @@
 /**
- * Strategies for partitioning graph
+ * Strategies for partitioning graph.
  *
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
