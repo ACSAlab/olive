@@ -251,9 +251,9 @@ class Partition {
         for (PartitionId i = 0; i < numParts; i++) {
             if (i == partitionId) continue;
             if (outgoingEdges[i] > 0)
-                outboxes[i].reserve(outgoingEdges[i], deviceId);
+                outboxes[i].reserve(outgoingEdges[i]);
             if (incomingEdges[i] > 0)
-                inboxes[i].reserve(incomingEdges[i], deviceId);
+                inboxes[i].reserve(incomingEdges[i]);
         }
         delete[] outgoingEdges;
         delete[] incomingEdges;

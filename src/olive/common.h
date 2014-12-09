@@ -63,7 +63,7 @@ const int MAX_THREADS = MAX_THREADS_PER_BLOCK * MAX_BLOCKS;
  */
 #define BLOCK_INDEX blockIdx.x
 
-#define THREAD_INDEX threadIdx.x + blockDim.x * blockIdx.x
+#define THREAD_INDEX (threadIdx.x + blockDim.x * blockIdx.x)
 
 /**
  * A wrapper that asserts the success of CUDA calls
