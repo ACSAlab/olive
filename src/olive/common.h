@@ -19,9 +19,6 @@
 #include <assert.h>
 #include <inttypes.h>
 
-<<<<<<< HEAD
-
-
 /**
  * A wrapper that asserts the success of CUDA calls
  * TODO(onesuper): replace it with a method which throws an exception
@@ -36,10 +33,6 @@
         assert(false);                                                  \
         }                                                               \
     } while (0)
-=======
-#include "cuda.h"
->>>>>>> 95039a5bd2b30e4a6e9779d3cf8ff2c44aa7564b
-
 
 /** One word equals 64 bit. */
 typedef uint64_t Word;
