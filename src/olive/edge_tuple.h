@@ -1,5 +1,5 @@
 /**
- * Edge tuples
+ * Edge tuples.
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-11-06
@@ -12,8 +12,8 @@
 #include "common.h"
 
 /**
- *  An edge is ternary tuple (`srcId`, `dstId`, `attr`)
- * 
+ *  An edge is ternary tuple (`srcId`, `dstId`, `attr`).
+ *
  * @tparam ED type of the edge attribute
  */
 template<typename ED>

@@ -7,16 +7,6 @@
  * Last Modified: 2014-11-15
  */
 
-<<<<<<< HEAD
-#include "flexible.h"
-
-#include "unitest_common.h"
-
-
-
-int main(int argc, char ** arg) {
-    if (argc < 2) {
-=======
 #include <iostream>
 #include <vector>
 
@@ -66,17 +56,13 @@ void unitest_random_paritition(const flex::Graph<int, int> &graph, int numPart) 
 
 int main(int argc, char ** argv) {
     if (argc < 3) {
->>>>>>> FETCH_HEAD
+
         printf("wrong argument");
         return 1;
     }
 
     flex::Graph<int, int> graph;
-<<<<<<< HEAD
 
-    graph.fromEdgeListFile(argv[1]);
-
-=======
     graph.fromEdgeListFile(argv[1]);
     PartitionId numParts = atoi(argv[2]);
     // Basic Information
@@ -97,7 +83,6 @@ int main(int argc, char ** argv) {
 
     // Tests random parition after shuffle
     unitest_random_paritition(graph, numParts);
->>>>>>> FETCH_HEAD
 
     return 0;
 }

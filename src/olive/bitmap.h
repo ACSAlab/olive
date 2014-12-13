@@ -1,5 +1,5 @@
 /**
- * A simple bit set implementation
+ * A simple bit set implementation on CPU.
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-11-05

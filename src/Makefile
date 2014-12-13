@@ -17,7 +17,7 @@ disable_l1_cache = 0
 
 
 #-------------------------------------------------------------------------------
-# Directories
+# Project Directories
 #-------------------------------------------------------------------------------
 PROJECT_ROOT = ..
 SRC_DIR      = $(PROJECT_ROOT)/src
@@ -29,6 +29,11 @@ OBJ_DIR      = $(BUILD_DIR)/obj
 BIN_DIR      = $(BUILD_DIR)/bin
 LIB_DIR      = $(BUILD_DIR)/lib
 
+#-------------------------------------------------------------------------------
+# CUDA Directories
+#-------------------------------------------------------------------------------
+CUDA_INC_DIR = "$(shell dirname $(NVCC))/../include"
+CUDA_LIB_DIR = "$(shell dirname $(NVCC))/../lib64"
 
 #-------------------------------------------------------------------------------
 # Compliers and flags
@@ -36,16 +41,15 @@ LIB_DIR      = $(BUILD_DIR)/lib
 CC = g++
 NVCC = "$(shell which nvcc)"
 
-NVCCFLAGS = -g -std=c++11
-CCFLAGS = -Wall -g -std=c++11
+NVCCFLAGS = -G -g -std=c++11
 
+CCFLAGS = -Wall -g -std=c++11
 
 #-------------------------------------------------------------------------------
 # CUDA Capability 2.0 or 3.5
 #-------------------------------------------------------------------------------
 GEN_SM20 = -gencode=arch=compute_20,code=\"sm_20,compute_20\"
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\"
-
 ifneq ($(force_sm35), 1)
 	NVCCFLAGS += $(GEN_SM20)
 else
@@ -74,12 +78,12 @@ else
 	CCFLAGS += -m64
 endif
 
-
 #-------------------------------------------------------------------------------
-# Includes (src and include are both in OLIVE_DIR)
+# Includes & Libraries
 #-------------------------------------------------------------------------------
-INC = -I$(OLIVE_DIR)
-
+INC = -I$(CUDA_INC_DIR) -I$(OLIVE_DIR)
+LIB = -L$(CUDA_LIB_DIR)
+DLL = -lcudart
 
 #-------------------------------------------------------------------------------
 # Generates the name lists for building
@@ -117,26 +121,22 @@ libolive: $(LIB_DIR) objects
 objects: $(OBJ_DIR) $(CUOBJ) $(CCOBJ)
 
 $(CUOBJ): $(OBJ_DIR)/%.cu.o: $(OLIVE_DIR)/%.cu $(DEPS)
-	@echo "Creating cuda object: "$@
-	@$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) -c
+	$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) -c
 
 $(CCOBJ): $(OBJ_DIR)/%.cc.o: $(OLIVE_DIR)/%.cc $(DEPS)
-	@echo "Creating cpp object: "$@
-	@$(CC) -o $@ $< $(CCFLAGS) $(INC) -c
+	$(CC) -o $@ $< $(CCFLAGS) $(INC) -c
 
 
 #-------------------------------------------------------------------------------
 # Rules for unitest (unitest/%.cc => bin/%)
 #-------------------------------------------------------------------------------
-unitests: $(BIN_DIR) $(UTEXE) $(UTCUEXE) 
+unitests: $(BIN_DIR) $(UTEXE) $(UTCUEXE)
 
 $(UTEXE): $(BIN_DIR)/%: $(UTEST_DIR)/%.cc $(DEPS) 
-	@echo "Building unitest executable: "$@	
-	@$(CC) -o $@ $< $(CCFLAGS) $(INC)
+	$(CC) -o $@ $< $(CCFLAGS) $(INC) $(LIB) $(DLL)
 
 $(UTCUEXE): $(BIN_DIR)/%: $(UTEST_DIR)/%.cu $(DEPS) 
-	@echo "Building CUDA unitest executable: "$@	
-	@$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC)
+	$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) $(LIB) $(DLL)
 
 #-------------------------------------------------------------------------------
 # Rules for BFS

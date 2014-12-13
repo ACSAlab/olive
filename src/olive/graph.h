@@ -1,5 +1,5 @@
 /**
- * Defines the interface for the graph
+ * Defines the interface for the graph.
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-11-02
@@ -14,7 +14,7 @@
 
 /**
  * The Graph abstractly represents a graph with arbitrary attributes
- * associated with vertices and edges.  
+ * associated with vertices and edges.
  *
  * @tparam VD the vertex attribute type
  * @tparam ED the edge attribute type

@@ -1,5 +1,5 @@
 /**
- * Logger
+ * Logger.
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-11-05
