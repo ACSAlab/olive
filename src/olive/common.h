@@ -19,6 +19,8 @@
 #include <assert.h>
 #include <inttypes.h>
 
+#include <cuda.h>
+ 
 /**
  * A wrapper that asserts the success of CUDA calls
  * TODO(onesuper): replace it with a method which throws an exception
