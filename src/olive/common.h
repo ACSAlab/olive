@@ -79,21 +79,6 @@ const int MAX_THREADS = MAX_THREADS_PER_BLOCK * MAX_BLOCKS;
 
 #define THREAD_INDEX (threadIdx.x + blockDim.x * blockIdx.x)
 
-/**
- * A wrapper that asserts the success of CUDA calls
- * TODO(onesuper): replace it with a method which throws an exception
- *
- */
-#define CUDA_CHECK(cuda_call)                                           \
-    do {                                                                \
-        cudaError_t err = cuda_call;                                    \
-        if (err != cudaSuccess) {                                       \
-        fprintf(stderr, "CUDA Error in file '%s' in line %i : %s.\n",   \
-                __FILE__, __LINE__, cudaGetErrorString(err));           \
-        assert(false);                                                  \
-        }                                                               \
-    } while (0);
-
 /** Generic success and failure */
 typedef enum {
     SUCCESS = 0,

@@ -42,6 +42,7 @@ public:
     explicit Bitmap(int numBits) {
         numWords = ((numBits - 1) >> 6) + 1;
         cudaMallocManaged(&words, numWords*sizeof(Word));
+        memset(words, 0, numWords*sizeof(Word));
     }
     ~Bitmap() { cudaFree(words); }
 
