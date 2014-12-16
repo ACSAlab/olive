@@ -33,7 +33,7 @@ class GRD {
      * Do not check the boundaries for speed.
      */
     __host__ __device__
-    inline T& operator[] (size_t index) const {
+     inline T& operator[] (size_t index) const {
 #ifdef __CUDA_ARCH__
         return elemsDevice[index];
 #else

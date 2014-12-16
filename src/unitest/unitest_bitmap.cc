@@ -20,7 +20,7 @@ int get_rand(int modulo)  {
     return rand()%modulo;
 }
 
-bool bitmap_equal_array(const Bitmap& b, bool A[], int size) {
+bool bitmap_equal_array(const cpu::Bitmap& b, bool A[], int size) {
     for (int i = 0; i < size; i++) {
         if (b.get(i) != A[i]) {
             std::cerr <<i <<"get=" <<b.get(i) <<"array=" <<A[i] <<std::endl;
@@ -36,8 +36,8 @@ void unitest_bitmap_operations(void) {
     int length2 = get_rand(MAXLEN);
     printf("test bit operation with size %d and %d\n", length1, length2);
 
-    Bitmap bitmap1(length1);
-    Bitmap bitmap2(length2);
+    cpu::Bitmap bitmap1(length1);
+    cpu::Bitmap bitmap2(length2);
 
     bool * binary_array1 = new bool[length1]();
     bool * binary_array2 = new bool[length2]();
@@ -62,10 +62,9 @@ void unitest_bitmap_operations(void) {
     assert(bitmap_equal_array(bitmap2, binary_array2, length2));
     printf("set bitmap2\n");
 
-
     int min = std::min(length1, length2);
     int max = std::max(length1, length2);
-    Bitmap b;
+    cpu::Bitmap b;
     bool * a = new bool[max]();
 
     // &
@@ -113,7 +112,7 @@ void unitest_bitmap_set_and_unset(void) {
     bool * binary_array = new bool[length]();
     for (int i = 0; i < length; i++)
         binary_array[i] = false;
-    Bitmap bitmap(length);
+    cpu::Bitmap bitmap(length);
 
     // Randomly sets half of the elements 1
     for (int i = 0; i < length/2; i++) {

@@ -19,22 +19,8 @@
 #include <assert.h>
 #include <inttypes.h>
 
-#include <cuda.h>
- 
-/**
- * A wrapper that asserts the success of CUDA calls
- * TODO(onesuper): replace it with a method which throws an exception
- * 
- */
-#define CUDA_CHECK(cuda_call)                                           \
-    do {                                                                \
-        cudaError_t err = cuda_call;                                    \
-        if (err != cudaSuccess) {                                       \
-        fprintf(stderr, "CUDA Error in file '%s' in line %i : %s.\n",   \
-                __FILE__, __LINE__, cudaGetErrorString(err));           \
-        assert(false);                                                  \
-        }                                                               \
-    } while (0)
+
+
 
 /** One word equals 64 bit. */
 typedef uint64_t Word;
@@ -93,24 +79,6 @@ const int MAX_THREADS = MAX_THREADS_PER_BLOCK * MAX_BLOCKS;
         assert(false);                                                  \
         }                                                               \
     } while (0);
-
-/** Generic success and failure */
-typedef enum {
-    SUCCESS = 0,
-    FAILURE,
-} Error;
-
-
-/** Different levels of memory location  */
-typedef enum {
-    CPU_ONLY = 0,   // Normal C allocations
-    PINNED,         // Zero-copy memory
-    MAPPED,         // Allocate on host side and maps the allocation into
-                    // CUDA address space. The device pointer to the memory
-                    // is obtained by calling cudaHostGetDevicePointer().
-    MANAGED,        // Unified memory supported in CUDA 6.0
-    GPU_ONLY,       // Normal CUDA allocations
-} MemoryLevel;
 
 
 #endif  // COMMON_H

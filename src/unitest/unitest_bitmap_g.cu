@@ -5,26 +5,26 @@
  * Last modified on 2014-11-30
  */
 
-#include "bitmap.cuh"
+#include "bitmap_g.h"
 #include <iostream>
 
 #define SIZE 500
 
 __global__
-void Kernel_by_pointer(Bitmap *bitmap) {
-	// the read access can be done concurrently
-	if (bitmap->get(49) != true)
-		return;
-	if (bitmap->capacity() != 512)
-		return;
+void Kernel_by_pointer(gpu::Bitmap * bitmap) {
+	// // the read access can be done concurrently
+	// if (bitmap->get(49) != true)
+	// 	return;
+	// if (bitmap->capacity() != 512)
+	// 	return;
 
 	if (threadIdx.x %3 == 0)
-		bitmap->set_gpu(threadIdx.x);
+		bitmap->set(threadIdx.x);
 	if (threadIdx.x %2 == 0)
-		bitmap->unset_gpu(threadIdx.x);
+		bitmap->unset(threadIdx.x);
 }
 
-bool bitmap_equal_array(const Bitmap& b, bool A[], int size) {
+bool bitmap_equal_array(const gpu::Bitmap& b, bool A[], int size) {
 	int i;
     for (i = 0; i < size; i++) {
         if (b.get(i) != A[i]) {
@@ -36,13 +36,13 @@ bool bitmap_equal_array(const Bitmap& b, bool A[], int size) {
 }
 
 int main() {
-	Bitmap *bitmap = new Bitmap(SIZE);
+	gpu::Bitmap *bitmap = new gpu::Bitmap(SIZE);
 	bool *binary_array = new bool[SIZE]();
 
-	bitmap->set_cpu(299);
-	bitmap->set_cpu(49);
-	bitmap->set_cpu(4);
-	bitmap->set_cpu(300);
+	bitmap->set(299);
+	bitmap->set(49);
+	bitmap->set(4);
+	bitmap->set(300);
 
 	binary_array[299] = true;
 	binary_array[49] = true;

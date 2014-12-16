@@ -14,6 +14,9 @@
 #include "common.h"
 #include "utils.h"
 
+
+namespace cpu {
+
 /**
  * A simple bitmap implementation. No bound checking so it is fast.
  */
@@ -38,9 +41,7 @@ class Bitmap {
         words = new Word[numWords]();
     }
 
-    ~Bitmap() {
-        delete[] words;
-    }
+    ~Bitmap() { delete[] words; }
 
     /** Get the capacity (number of bits) contained in this bitmap */
     int capacity() const {
@@ -157,5 +158,7 @@ class Bitmap {
         return newBitmap;
     }
 };
+
+}  // namespace cpu
 
 #endif  // BITMAP_H

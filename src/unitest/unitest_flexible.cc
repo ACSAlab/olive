@@ -56,13 +56,11 @@ void unitest_random_paritition(const flex::Graph<int, int> &graph, int numPart) 
 
 int main(int argc, char ** argv) {
     if (argc < 3) {
-
         printf("wrong argument");
         return 1;
     }
 
     flex::Graph<int, int> graph;
-
     graph.fromEdgeListFile(argv[1]);
     PartitionId numParts = atoi(argv[2]);
     // Basic Information

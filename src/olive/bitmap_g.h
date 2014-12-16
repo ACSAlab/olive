@@ -8,10 +8,9 @@
 #ifndef BITMAP_CUH
 #define BITMAP_CUH
 
-#include <algorithm>
-
 #include "common.h"
-#include "utils.h"
+
+namespace gpu {
 
 class Managed {
 public:
@@ -41,7 +40,8 @@ public:
      */
     explicit Bitmap(int numBits) {
         numWords = ((numBits - 1) >> 6) + 1;
-        cudaMallocManaged(&words, numWords*sizeof(Word));
+        cudaMallocManaged(&words, numWords * sizeof(Word));
+        memset(words, 0, numWords * sizeof(Word));
     }
     ~Bitmap() { cudaFree(words); }
 
@@ -50,15 +50,16 @@ public:
      * 
      * @param index [the bit index]
      */ 
-    __host__ 
-    void set_cpu(int index) {
+    __host__ __device__
+    void set(int index) {
         Word bitmask = static_cast<Word>(1) << (index & 0x3f);
+#ifdef __CUDA_ARCH__
+        atomicOr(
+            reinterpret_cast<unsigned long long *>(&words[index >> 6]),
+            static_cast<unsigned long long>(bitmask) );
+#else
         words[index >> 6] |= bitmask;
-    }
-    __device__
-    void set_gpu(int index) {
-        Word bitmask = static_cast<Word>(1) << (index & 0x3f);
-        atomicOr( (unsigned long long *) &(words[index >> 6]), (unsigned long long) bitmask);
+#endif
     }
 
     /**
@@ -66,15 +67,16 @@ public:
      * 
      * @param index [the bit index]
      */ 
-    __host__ 
-    void unset_cpu(int index) {
+    __host__ __device__
+    void unset(int index) {
         Word bitmask = static_cast<Word>(1) << (index & 0x3f);
+#ifdef __CUDA_ARCH__
+        atomicAnd(
+            reinterpret_cast<unsigned long long *>(&words[index >> 6]),
+            static_cast<unsigned long long>(~bitmask) );
+#else
         words[index >> 6] &= ~bitmask;
-    }
-    __device__  
-    void unset_gpu(int index) {
-        Word bitmask = static_cast<Word>(1) << (index & 0x3f);
-        atomicAnd((unsigned long long *) &words[index >> 6], (unsigned long long) ~bitmask);
+#endif
     }
 
     /**
@@ -98,5 +100,8 @@ public:
         return numWords << 6;
     }
 };
+
+
+}  // namespace gpu
 
 #endif  // BITMAP_CUH
