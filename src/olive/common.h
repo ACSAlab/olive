@@ -19,7 +19,7 @@
 #include <assert.h>
 #include <inttypes.h>
 
-#include "cuda.h"
+
 
 
 /** One word equals 64 bit. */
