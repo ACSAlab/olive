@@ -20,46 +20,46 @@
 #include "message_box.h"
 
 /**
+ * If a vertex's `partitionId` equals the partition's `partitionId`, then it
+ * refers to a local vertex. Otherwise `localId` refers to a remote one.
+ */
+class Vertex {
+public:
+    PartitionId  partitionId;
+    VertexId     localId;
+    explicit Vertex(PartitionId pid, VertexId id) {
+        partitionId = pid;
+        localId = id;
+    }
+};
+
+/**
+ * Stub information sending to a remote vertex.
+ * @note `id` here is .
+ */
+class Stub {
+public:
+    VertexId  id;       /** Specifying the remote vertex by its local id. */
+    void     *message;  /** Content of the message. */
+};
+
+/**
  * Managing the resource for each GPU-resident graph partition.
- * 
+ *
  * Each graph partition is stored in (Compressed Sparse Row) format for its
- * efficiency. In effect, CSR storage minimizes the memory footprint at the 
+ * efficiency. In effect, CSR storage minimizes the memory footprint at the
  * expense of bringing indirect memory access.
  *
- * Partitions communicate with each other through a buffer-copying scheme: 
- * e.g. One partition copies its out-buffer to the corresponding in-buffer of 
+ * Partitions communicate with each other through a buffer-copying scheme:
+ * e.g. One partition copies its out-buffer to the corresponding in-buffer of
  * the other partition.
- * 
+ *
  * @note The original vertex id in original graph is mapped to a new local id
  * in a graph partition. e.g. The ids are continuous from 0 to `vertices`-1;
  *
  */
 class Partition {
- public:
-    /**
-     * If a vertex's `partitionId` equals the partition's `partitionId`, then it
-     * refers to a local vertex. Otherwise `id` refers to a remote one. 
-     */
-    class Vertex {
-     public:
-        PartitionId  partitionId;
-        VertexId     id;
-        explicit Vertex(PartitionId pid, VertexId id_) {
-            partitionId = pid;
-            id = id_;
-        }
-    };
-
-    /**
-     * Stub information sending to a remote vertex.
-     * @note `id` here is .
-     */
-    class Stub {
-     public:
-        VertexId  id;       /** Specifying the remote vertex by its local id. */
-        void *    message;  /** Content of the message. */
-    };
-
+public:
     /** Partition identification. Obtained via a pass-in subgraph */
     PartitionId    partitionId;
 
@@ -70,7 +70,7 @@ class Partition {
     int            deviceId;
 
     /**
-     * Stores the starting indices for querying outgoing edges of local vertices 
+     * Stores the starting indices for querying outgoing edges of local vertices
      * (vertices that in this partition).
      * e.g., vertices[i] tells where the outgoing edges of vertex `i` are.
      * The number of its outgoing edges is given by vertices[i+1] - vertices[i].
@@ -84,7 +84,7 @@ class Partition {
      * It differentiates the boundary edges by `[[DstVertex]].paritionId`.
      * That is if `[[DstVertex]].paritionId` != this->partitionId,
      * the destination vertex is in a remote partition.
-     * 
+     *
      * @note Boundary edges are those outgoing edges whose destination vertex
      * is in other partitions. When traversing an boundary edge, a message will
      * be push to `outbox`.
@@ -94,13 +94,13 @@ class Partition {
     GRD<Vertex>    edges;
 
     /**
-     * Mapping the local linear ids in a partition to original ids when 
+     * Mapping the local linear ids in a partition to original ids when
      * aggregating the final results.
      */
     GRD<VertexId>  globalIds;
 
     /**
-     * Messages sending to remote vertices are inserted into corresponding 
+     * Messages sending to remote vertices are inserted into corresponding
      * `outboxes`. The number of outboxes is equal to the number of partitions
      * in the graph, which is got in runtime.
      * If the vertex is in remote partition, then a message is inserted into
@@ -108,12 +108,12 @@ class Partition {
      * reserved for the local partition (do not allocate memory).
      * e.g. for partition 2, outboxes[0/1/3] is effective.
      */
-    MessageBox<Stub> * outboxes;
+    MessageBox<Stub> *outboxes;
 
     /**
      * Messages received from remote vertices.
      */
-    MessageBox<Stub> * inboxes;
+    MessageBox<Stub> *inboxes;
 
     /**
      * Enables overlapped communication and computation.
@@ -129,23 +129,27 @@ class Partition {
     cudaEvent_t     endEvent;
 
     /** Constructor */
-    Partition(): partitionId(0), deviceId(0), numParts(1),
+    Partition(): partitionId(0), deviceId(-1), numParts(0),
         outboxes(NULL), inboxes(NULL) {}
 
     /**
-     * Initializing a partition from a subgraph in flexible representation. 
+     * Initializing a partition from a subgraph in flexible representation.
      * By default, the partition is bound to device 0.
-     * 
+     *
      * The subgraph marks the vertices with a global id. Records the original
      * ids in `globalIds`.
-     * 
+     *
      *
      * TODO(onesuper): more complicated partition-to-device assignment.
      */
     void fromSubgraph(const flex::Graph<int, int> &subgraph) {
         partitionId = subgraph.partitionId;
         numParts = subgraph.numParts;
-        vertices.reserve(subgraph.nodes()+1, deviceId);
+
+        // TODO(onesuper): change later
+        deviceId = partitionId % 2;
+
+        vertices.reserve(subgraph.nodes() + 1, deviceId);
         if (subgraph.edges() > 0)
             edges.reserve(subgraph.edges(), deviceId);
         if (subgraph.nodes() > 0)
@@ -157,21 +161,24 @@ class Partition {
         VertexId vertexCount = 0;
         EdgeId   edgeCount   = 0;
         for (auto v : subgraph.vertices) {
-            globalIds[localId++] = v.id;
+            globalIds[localId] = v.id;
             toLocal.insert(std::pair<VertexId, VertexId>(v.id, localId));
+            localId += 1;
         }
         for (auto v : subgraph.vertices) {
-            vertices[vertexCount++] = edgeCount;
+            vertices[vertexCount] = edgeCount;
             for (auto e : v.outEdges) {
                 if (subgraph.hasVertex(e.id)) {  // In this partition
-                    edges[edgeCount++] = Vertex(partitionId, toLocal[e.id]);
+                    edges[edgeCount] = Vertex(partitionId, toLocal[e.id]);
                 } else {                         // In remote partition
                     auto it = subgraph.ghostVertices.find(e.id);
                     assert(it != subgraph.ghostVertices.end());
-                    edges[edgeCount++] = Vertex(it->second.first,
+                    edges[edgeCount] = Vertex(it->second.first,
                                                 it->second.second);
                 }
+                edgeCount += 1;
             }
+            vertexCount += 1;
         }
         vertices[vertexCount] = edgeCount;
         assert(localId == subgraph.nodes());
@@ -184,7 +191,6 @@ class Partition {
         initMessageBoxes(subgraph);
 
         // Sets up the CUDA resources.
-        deviceId = partitionId % 2;
         CUDA_CHECK(cudaSetDevice(deviceId));
         CUDA_CHECK(cudaStreamCreate(&streams[0]));
         CUDA_CHECK(cudaStreamCreate(&streams[1]));
@@ -196,14 +202,16 @@ class Partition {
     ~Partition() {
         if (outboxes) delete[] outboxes;
         if (inboxes)  delete[] inboxes;
-        CUDA_CHECK(cudaSetDevice(deviceId));
-        CUDA_CHECK(cudaStreamDestroy(streams[0]));
-        CUDA_CHECK(cudaStreamDestroy(streams[1]));
-        CUDA_CHECK(cudaEventDestroy(startEvent));
-        CUDA_CHECK(cudaEventDestroy(endEvent));
+        if (deviceId >= 0) {
+            CUDA_CHECK(cudaSetDevice(deviceId));
+            CUDA_CHECK(cudaStreamDestroy(streams[0]));
+            CUDA_CHECK(cudaStreamDestroy(streams[1]));
+            CUDA_CHECK(cudaEventDestroy(startEvent));
+            CUDA_CHECK(cudaEventDestroy(endEvent));
+        }
     }
 
- private:
+private:
     /**
      * Initializing `outboxes` and `inboxes` according to the topological
      * information of the subgraph, since we have to allocate memory before-hand
@@ -214,7 +222,7 @@ class Partition {
      * `inbox` for a partition is equal to the number of those incoming edges
      * coming from this remote partition.
      *
-     * The message boxes is allocated at the maximum size when every vertex 
+     * The message boxes is allocated at the maximum size when every vertex
      * wants to send a message to its remote neighbors.
      *
      * @note Duplication is allowed when counting incoming/outgoing edges, since
@@ -222,8 +230,8 @@ class Partition {
      * to the same remote vertex.
      */
     void initMessageBoxes(const flex::Graph<int, int> &subgraph) {
-        int * outgoingEdges = new int[numParts]();
-        int * incomingEdges = new int[numParts]();
+        int *outgoingEdges = new int[numParts]();
+        int *incomingEdges = new int[numParts]();
         outboxes = new MessageBox<Stub>[numParts];
         inboxes = new MessageBox<Stub>[numParts];
         for (auto v : subgraph.vertices) {
