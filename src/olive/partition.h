@@ -145,10 +145,10 @@ public:
     void fromSubgraph(const flex::Graph<int, int> &subgraph) {
         partitionId = subgraph.partitionId;
         numParts = subgraph.numParts;
-
         // TODO(onesuper): change later
         deviceId = partitionId % 2;
 
+        double startTime = util::currentTimeMillis();
         vertices.reserve(subgraph.nodes() + 1, deviceId);
         if (subgraph.edges() > 0)
             edges.reserve(subgraph.edges(), deviceId);
@@ -196,6 +196,9 @@ public:
         CUDA_CHECK(cudaStreamCreate(&streams[1]));
         CUDA_CHECK(cudaEventCreate(&startEvent));
         CUDA_CHECK(cudaEventCreate(&endEvent));
+
+        LOG(INFO) << "It took me " << util::currentTimeMillis() - startTime
+                  << "ms to generate the CSR representation.";
     }
 
     /** Destructor **/

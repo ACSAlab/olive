@@ -13,7 +13,7 @@ void queue2mask(
     int curLevel)
 {
     int tid = THREAD_INDEX;
-    if (tid > *queueSize) return;
+    if (tid >= *queueSize) return;
     VertexId outNode = queue[tid];
     EdgeId first = vertices[outNode];
     EdgeId last = vertices[outNode + 1];
@@ -35,7 +35,7 @@ void mask2queue(
     int *queueSize)
 {
     int tid = THREAD_INDEX;
-    if (tid > n) return;
+    if (tid >= n) return;
     if (mask[tid] == 1) {
         mask[tid] = 0;
         size_t offset = atomicAdd(queueSize, 1);

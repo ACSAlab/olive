@@ -38,8 +38,8 @@ std::pair<int, int> kernelConfig(int threads,
                   threads / threadsPerBlock :
                   threads / threadsPerBlock + 1;
     if (blocks > MAX_BLOCKS) blocks = MAX_BLOCKS;
-    LOG(INFO) << "The kernel is configured to (" << blocks
-              << ", " << threadsPerBlock << ")";
+    // LOG(INFO) << "The kernel is configured to (" << blocks
+    //           << ", " << threadsPerBlock << ")";
     return std::make_pair(blocks, threadsPerBlock);
 }
 

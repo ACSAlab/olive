@@ -29,9 +29,9 @@ int main(int argc, char **argv) {
 
     auto levels = bfs_top_down(par, graph.nodes());
 
-    for (int i = 0; i < levels.size(); i++) {
-        printf("%d ", levels[i]);
-    }
+    // for (int i = 0; i < levels.size(); i++) {
+    //     printf("%d ", levels[i]);
+    // }
 
     return 0;
 }

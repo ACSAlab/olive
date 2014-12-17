@@ -144,8 +144,11 @@ public:
     /** Number of the partition. */
     PartitionId numParts;
 
+    /** Partition strategy. */
+    PartitionStrategy partitionStrategy;
+
     /** Constructor */
-    Graph(): partitionId(0), numParts(1) {}
+    Graph(): partitionId(0), numParts(1), partitionStrategy() {}
 
     /**
      * Returns the total vertex number in the graph.
@@ -173,17 +176,15 @@ public:
     }
 
     /**
-     * Check the existence of a vertex by specifying its `id`.
+     * Check the existence of a vertex by specifying its `id` in O(1) time.
      *
      * @param  id   The id to look up
      * @return True if it exists
      */
     bool hasVertex(VertexId id) const {
-        for (auto v : vertices) {
-            if (v.id == id) return true;
-        }
-        return false;
+        return (partitionId == partitionStrategy.getPartition(id, numParts));
     }
+
     /**
      * Turning edge tuple representation to flex's edge representation.
      *
@@ -335,14 +336,15 @@ public:
         PartitionId numParts = 1) {
         assert(numParts != 0);
 
+        double startTime = util::currentTimeMillis();
         // Sort before partition.
         sortVerticesById();
         sortEdgesById();
-
         auto subgraphs = std::vector<Graph<VD, ED>>(numParts);
         for (PartitionId i = 0; i < numParts; i++) {
             subgraphs[i].partitionId = i;
             subgraphs[i].numParts = numParts;
+            subgraphs[i].partitionStrategy = strategy;
         }
         for (auto v : vertices) {
             PartitionId partitionId = strategy.getPartition(v.id, numParts);
@@ -355,6 +357,9 @@ public:
                 subgraphs[i].ghostVertices[v.id] = ghost;
             }
         }
+        LOG(INFO) << "It took me " << util::currentTimeMillis() - startTime
+                  << "ms to partition the graph.";
+
         return subgraphs;
     }
 

@@ -13,8 +13,7 @@
 #include "utils.h"
 
 /**
- * An abstract interface for partitioning vertices for flexible graph
- * representation.
+ * An interface for partitioning vertices for flexible graph representation.
  *
  * TODO(onesuper): Partitioning according to the topology of graph.
  * A partition strategy may possibly consider some of the graph attributes,
@@ -29,7 +28,9 @@ public:
      * @return           The partition number for a given vertex
      */
     virtual
-    PartitionId getPartition(VertexId id, PartitionId numParts) const = 0;
+    PartitionId getPartition(VertexId id, PartitionId numParts) const {
+        return 0;
+    }
 };
 
 class RandomEdgeCut: public PartitionStrategy {
