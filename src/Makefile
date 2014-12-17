@@ -23,7 +23,7 @@ PROJECT_ROOT = ..
 SRC_DIR      = $(PROJECT_ROOT)/src
 OLIVE_DIR    = $(SRC_DIR)/olive
 UTEST_DIR    = $(SRC_DIR)/unitest
-ALGO_DIR     = $(SRC_DIR)/algorithm
+ALGO_DIR     = $(SRC_DIR)/algo
 BUILD_DIR    = $(PROJECT_ROOT)/build
 OBJ_DIR      = $(BUILD_DIR)/obj
 BIN_DIR      = $(BUILD_DIR)/bin
@@ -94,6 +94,8 @@ UTSRC   = $(wildcard $(UTEST_DIR)/*.cc)
 UTEXE   = $(patsubst $(UTEST_DIR)/%.cc, $(BIN_DIR)/%, $(UTSRC))
 UTCUSRC = $(wildcard $(UTEST_DIR)/*.cu)
 UTCUEXE = $(patsubst $(UTEST_DIR)/%.cu, $(BIN_DIR)/%, $(UTCUSRC))
+ALGOUSRC = $(wildcard $(ALGO_DIR)/*.cu)
+ALGOUEXE = $(patsubst $(ALGO_DIR)/%.cu, $(BIN_DIR)/%, $(ALGOUSRC))
 DEPS    = $(wildcard $(OLIVE_DIR)/*.h)
 
 
@@ -137,15 +139,12 @@ $(UTCUEXE): $(BIN_DIR)/%: $(UTEST_DIR)/%.cu $(DEPS)
 	$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) $(LIB) $(DLL)
 
 #-------------------------------------------------------------------------------
-# Rules for BFS
+# Rules for algo
 #-------------------------------------------------------------------------------
-#bfs: $(BIN_DIR) $(BIN_DIR)/test_bfs
+algos: $(BIN_DIR) $(ALGOUEXE)
 
-#$(BIN_DIR)/test_bfs: $(TEST_DIR)/test_bfs.cu libs
-#	@echo "Building executable: "$@	
-#	@$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) $(LIB_DIR)/libolive.a
-
-
+$(ALGOUEXE): $(BIN_DIR)/%: $(ALGO_DIR)/%.cu $(DEPS) 
+	$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) $(LIB) $(DLL)
 
 #-------------------------------------------------------------------------------
 # Rules for build directories

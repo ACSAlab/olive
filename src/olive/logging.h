@@ -23,12 +23,12 @@ enum LogLevel {
  * A simple static class for logging which is not thread-safe.
  */
 class Logging {
- private:
+private:
     std::ostringstream os;
     static LogLevel reportingLevel;
     LogLevel messageLevel;
 
- public:
+public:
     /** Output when destroyed. */
     ~Logging() {
         if (messageLevel >= Logging::ReportingLevel()) {
@@ -42,18 +42,18 @@ class Logging {
      * Gets an out-string-stream at message level `mesgLevel`.
      * The caller to this function can append strings to this stream.
      */
-    std::ostringstream& Get(LogLevel mesgLevel = INFO) {
+    std::ostringstream &Get(LogLevel mesgLevel = INFO) {
         os << toString(mesgLevel) << ": ";
         messageLevel = mesgLevel;
         return os;
     }
 
     /** Accessing the reporting level */
-    static LogLevel& ReportingLevel() {
+    static LogLevel &ReportingLevel() {
         return reportingLevel;
     }
 
- private:
+private:
     std::string toString(LogLevel level) {
         std::string strLevel;
         switch (level) {

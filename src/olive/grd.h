@@ -14,17 +14,15 @@
 /**
  * GPU-Resident Dataset (GRD) provides the utility for allocating data buffers
  * which can be transferred between CPU and GPU and accessed from both CPU and GPU.
- * GRD is allocated on host pinned memory, which is accessible by all CUDA contexts.
  */
 template<typename T>
 class GRD {
- private:
-    T *     elemsHost;    /** Points to the host-allocated buffer */
-    T *     elemsDevice;  /** Points to the GPU-allocated buffer */
+public:
+    T      *elemsHost;    /** Points to the host-allocated buffer */
+    T      *elemsDevice;  /** Points to the GPU-allocated buffer */
     size_t  length;       /** The length of the buffer */
     int     deviceId;     /** The device GRD locates at */
 
- public:
     /** List Initializer */
     GRD(): elemsHost(NULL), elemsDevice(NULL), length(0), deviceId(-1) {}
 
@@ -33,7 +31,7 @@ class GRD {
      * Do not check the boundaries for speed.
      */
     __host__ __device__
-     inline T& operator[] (size_t index) const {
+    inline T &operator[] (size_t index) const {
 #ifdef __CUDA_ARCH__
         return elemsDevice[index];
 #else
@@ -50,46 +48,66 @@ class GRD {
      * Allocate the host- and device-resident buffer of length `len` on device
      * `id`.
      */
-    inline void reserve(size_t len, int id) {
+    inline void reserve(size_t len, int id = 0) {
         assert(len > 0);
         assert(id >= 0);
         deviceId = id;
         length = len;
         elemsHost = reinterpret_cast<T *>(malloc(len * sizeof(T)));
         CUDA_CHECK(cudaSetDevice(deviceId));
-        CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **>(&elemsDevice),
-                                  len * sizeof(T), cudaHostAllocPortable));
+        CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&elemsDevice),
+                              len * sizeof(T)));
     }
 
-    /** 
+    /**
+     * Set all the elements to the value `x` on the host, then caches.
+     */
+    void allTo(T x) {
+        for (size_t i = 0; i < length; i++) {
+            elemsHost[i] = x;
+        }
+        cache();
+    }
+
+    /**
+     * Set elements[i] to the value `x` on the host.
+     */
+    void set(size_t i, T x) {
+        elemsHost[i] = x;
+        CUDA_CHECK(cudaMemcpy(elemsDevice + i, elemsHost + i,
+                              1 * sizeof(T), cudaMemcpyDefault));
+    }
+
+    /**
      * Write-backs the dataset from GPU's on-board memory to host memory.
      */
     inline void persist() {
-        assert(length > 0);
+        if (length == 0) return;
         CUDA_CHECK(cudaSetDevice(deviceId));
-        CUDA_CHECK(cudaMemcpy(elemsDevice, elemsHost,
+        CUDA_CHECK(cudaMemcpy(elemsHost, elemsDevice,
                               length * sizeof(T), cudaMemcpyDefault));
     }
 
-    /** 
+    /**
      * Caches the dataset in GPU's on-board memory.
      */
     inline void cache() {
-        assert(length > 0);
+        if (length == 0) return;
         CUDA_CHECK(cudaSetDevice(deviceId));
         CUDA_CHECK(cudaMemcpy(elemsDevice, elemsHost,
                               length * sizeof(T), cudaMemcpyDefault));
     }
 
-    /** 
+    /**
      * Free both host- and device- resident buffers.
      */
     inline void del() {
+        if (deviceId < 0) return;
         if (elemsHost)
             free(elemsHost);
         if (elemsDevice) {
             CUDA_CHECK(cudaSetDevice(deviceId));
-            CUDA_CHECK(cudaFreeHost(elemsDevice));
+            CUDA_CHECK(cudaFree(elemsDevice));
         }
     }
 

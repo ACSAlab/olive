@@ -21,7 +21,7 @@
  */
 template <typename VD, typename ED>
 class Graph {
- public:
+public:
     /**
      * An RDD containing the vertices and their associated attributes.
      */

@@ -1,6 +1,6 @@
 /**
  * Unit test for the logging utility
- * 
+ *
  *
  * Created by: onesuper (onesuperclark@gmail.com)
  * Created on: 2014-11-15
@@ -22,7 +22,7 @@ void all_levels(void) {
 }
 
 
-int main(int argc, char ** arg) {
+int main(int argc, char **arg) {
     printf("testing logging (all)\n");
     all_levels();
 

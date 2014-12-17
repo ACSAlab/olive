@@ -12,19 +12,6 @@
 
 namespace gpu {
 
-class Managed {
-public:
-  void *operator new(size_t len) {
-    void *ptr;
-    cudaMallocManaged(&ptr, len);
-    return ptr;
-  }
-
-  void operator delete(void *ptr) {
-    cudaFree(ptr);
-  }
-};
-
 class Bitmap : public Managed {
 private:
     Word *words;
@@ -35,7 +22,7 @@ public:
 
     /**
      * Allocate a bitmap initalize with zeros on unified memory
-     * 
+     *
      * @param  numBits [number of bits in the bitmap]
      */
     explicit Bitmap(int numBits) {
@@ -43,13 +30,15 @@ public:
         cudaMallocManaged(&words, numWords * sizeof(Word));
         memset(words, 0, numWords * sizeof(Word));
     }
-    ~Bitmap() { cudaFree(words); }
+    ~Bitmap() {
+        cudaFree(words);
+    }
 
     /**
      * Sets the bit at the specified index to 1. Both host and device side
-     * 
+     *
      * @param index [the bit index]
-     */ 
+     */
     __host__ __device__
     void set(int index) {
         Word bitmask = static_cast<Word>(1) << (index & 0x3f);
@@ -64,9 +53,9 @@ public:
 
     /**
      * Sets the bit at the specified index to 0. Both host and device side
-     * 
+     *
      * @param index [the bit index]
-     */ 
+     */
     __host__ __device__
     void unset(int index) {
         Word bitmask = static_cast<Word>(1) << (index & 0x3f);

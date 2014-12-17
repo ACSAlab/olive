@@ -24,17 +24,17 @@
 
 namespace flex {
 /**
- * Directed edge structure for flexible graph representation. 
+ * Directed edge structure for flexible graph representation.
  * Each edge contains an `id` standing for either its destination or its source,
  * and its associated attribute. For an outgoing edge, `id` is the destination.
- * While for an incoming edge, `id` is the source. 
- * 
+ * While for an incoming edge, `id` is the source.
+ *
  *
  * @tparam ED the edge attribute type
  */
 template<typename ED>
 class Edge {
- public:
+public:
     VertexId id;
     ED       attr;
 
@@ -60,7 +60,7 @@ class Edge {
  */
 template<typename VD, typename ED>
 class Vertex {
- public:
+public:
     /**
      * Storing only outEdges is sufficient to express the topology of a graph.
      * However, keeping this information is useful when allocating the message
@@ -118,7 +118,7 @@ class Vertex {
  */
 template <typename VD, typename ED>
 class Graph {
- public:
+public:
     /** All existing vertices in a graph. */
     std::vector< Vertex<VD, ED> > vertices;
 
@@ -127,7 +127,7 @@ class Graph {
      * `partitionId` and the local id for those missing vertices.
      * The ghost vertices are stored as key-value pairs, where the key is the
      * global id and the value is a (partitionId, localId) pair.
-     * It can be used to establish a routing table which ships a ghost vertex 
+     * It can be used to establish a routing table which ships a ghost vertex
      * to its remote partition.
      *
      * @note This information is useful when allocating the message buffers
@@ -154,7 +154,7 @@ class Graph {
         return vertices.size();
     }
 
-    /** 
+    /**
      * Returns the total edge number in the graph.
      */
     size_t edges() const {
@@ -165,7 +165,7 @@ class Graph {
         return sum;
     }
 
-    /** 
+    /**
      * Returns the average degree of the graph in floating number.
      */
     float averageDegree() const {
@@ -186,10 +186,10 @@ class Graph {
     }
     /**
      * Turning edge tuple representation to flex's edge representation.
-     * 
+     *
      * @note When a graph is built with this method, the vertex-wise attribute
      * is ignored (simply set as 0).
-     * 
+     *
      * @param edgeTuple An edge tuple formed as (srcId, dstId , attr)
      */
     void addEdgeTuple(EdgeTuple<ED> edgeTuple) {
@@ -198,7 +198,7 @@ class Graph {
         bool srcExists = false;
         bool dstExists = false;
         // If the target node already exists, append the edge directly.
-        for (auto& v : vertices) {
+        for (auto &v : vertices) {
             if (srcExists && dstExists) break;
             if (v.id == edgeTuple.srcId) {
                 v.outEdges.push_back(outEdge);
@@ -231,7 +231,7 @@ class Graph {
      * ...
      * }}}
      */
-     void printDegreeDist() {
+    void printDegreeDist() {
         size_t outDegreeLog[32];
         int slotMax = 0;
         for (int i = 0; i < 32; i++) {
@@ -253,21 +253,21 @@ class Graph {
                vertexPercentage(outDegreeLog[0]));
 
         for (int i = 1; i <= slotMax; i++) {
-            int high = pow(2, i-1);
-            int low  = pow(2, i-2);
+            int high = pow(2, i - 1);
+            int low  = pow(2, i - 2);
             printf("outDegreeLog[%d]: (%d, %d]\t%lu\t%.2f%%\n", i, low, high,
                    outDegreeLog[i], vertexPercentage(outDegreeLog[i]));
         }
     }
 
     /**
-     * Load the graph from an edge list file where each line contains two 
+     * Load the graph from an edge list file where each line contains two
      * integers: a source id and a target id. Skips lines that begin with `#`.
      *
-     * @note If a graph is loaded from  a edge list file, the type of edge or 
+     * @note If a graph is loaded from  a edge list file, the type of edge or
      * vertex associated attribute is `int`. Meanwhile, the vertex-associated
      * data is given a meaningless value (0 by default).
-     * 
+     *
      * @example Loads a file in the following format:
      * {{{
      * # Comment Line
@@ -277,31 +277,31 @@ class Graph {
      * 2    7
      * 1    8
      * }}}
-     * 
+     *
      * @param path The path to the graph
      */
-    void fromEdgeListFile(const char * path) {
-        FILE * fileHandler = fopen(path, "r");
+    void fromEdgeListFile(const char *path) {
+        FILE *fileHandler = fopen(path, "r");
         if (fileHandler == NULL) {
             LOG(ERROR) << "Can not open graph file: " << path;
             return;
         }
         char line[1024];                // Stores the line read in
         char temp[1024];                // Shadows the line in a temp buffer
-        char * token;                   // Points to the parsed token
-        char * remaining;               // Points to the remaining line
+        char *token;                    // Points to the parsed token
+        char *remaining;                // Points to the remaining line
         double startTime = util::currentTimeMillis();
         while (fgets(line, 1024, fileHandler) != NULL) {
             if (line[0] != '\0' && line[0] != '#') {
                 std::vector<char *> tokens;
-                line[strlen(line)-1] = '\0';    // Remove the ending '\n'
+                line[strlen(line) - 1] = '\0';  // Remove the ending '\n'
                 strncpy(temp, line, 1024);
                 remaining = temp;
                 while ((token = strsep(&remaining, " \t")) != NULL) {
                     tokens.push_back(token);
                 }
                 if (tokens.size() < 2 || !util::isNumeric(tokens[0]) ||
-                    !util::isNumeric(tokens[1])) {
+                        !util::isNumeric(tokens[1])) {
                     LOG(WARNING) << "Invalid line: " << line;
                     continue;
                 }
@@ -320,9 +320,9 @@ class Graph {
 
     /**
      * Partitioning a graph to subgraphs by a specified `partitionStrategy`.
-     * Each subgraph has independent id space (instead of the global id space). 
+     * Each subgraph has independent id space (instead of the global id space).
      *
-     * @note We rely on the local offset to look for a vertex from another 
+     * @note We rely on the local offset to look for a vertex from another
      * partition. So it is not allowed to shuffle vertices in any subgraph.
      * It is an convenience for converting CSR representation. See `partition.cuh`.
      *
@@ -330,8 +330,15 @@ class Graph {
      * @param numParts          Number of partitions
      * @return                  A vector of subgraphs
      */
-    std::vector< Graph<VD, ED> > partitionBy(const PartitionStrategy &strategy,
-        PartitionId numParts) const {
+    std::vector< Graph<VD, ED> > partitionBy(
+        const PartitionStrategy &strategy = RandomEdgeCut(),
+        PartitionId numParts = 1) {
+        assert(numParts != 0);
+
+        // Sort before partition.
+        sortVerticesById();
+        sortEdgesById();
+
         auto subgraphs = std::vector<Graph<VD, ED>>(numParts);
         for (PartitionId i = 0; i < numParts; i++) {
             subgraphs[i].partitionId = i;
@@ -340,7 +347,7 @@ class Graph {
         for (auto v : vertices) {
             PartitionId partitionId = strategy.getPartition(v.id, numParts);
             subgraphs[partitionId].vertices.push_back(v);
-            VertexId localId = subgraphs[partitionId].vertices.size()-1;
+            VertexId localId = subgraphs[partitionId].vertices.size() - 1;
             // For other partitions, treat the vertex as an ghost one.
             auto ghost = std::pair<PartitionId, VertexId>(partitionId, localId);
             for (PartitionId i = 0; i < numParts; i++) {
@@ -407,20 +414,20 @@ class Graph {
 
     /** Shuffles the edges. */
     void shuffleEdges() {
-        for (auto& v : vertices) {
+        for (auto &v : vertices) {
             v.shuffleEdges();
         }
     }
 
     /** Sorts the edges by id. */
     void sortEdgesById() {
-        for (auto& v : vertices) {
+        for (auto &v : vertices) {
             v.sortEdgesById();
         }
     }
 
 
- private:
+private:
     /** Return the percentage of the `n` nodes in the graph */
     inline float vertexPercentage(size_t n) const {
         return static_cast<float>(n) * 100.0 / nodes();

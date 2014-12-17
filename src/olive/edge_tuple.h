@@ -18,7 +18,7 @@
  */
 template<typename ED>
 class EdgeTuple {
- public:
+public:
     VertexId srcId;     /** The vertex id of the source vertex */
     VertexId dstId;     /** The vertex id of the target vertex */
     ED attr;            /** The attribute associated with the edge */

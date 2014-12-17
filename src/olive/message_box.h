@@ -20,9 +20,9 @@
  */
 template<typename MSG>
 class MessageBox {
- public:
-    MSG *     buffer0;     /** Using a double-buffering method. */
-    MSG *     buffer1;     /** Using a double-buffering method. */
+public:
+    MSG      *buffer0;     /** Using a double-buffering method. */
+    MSG      *buffer1;     /** Using a double-buffering method. */
     size_t    maxLength;    /** Maximum length of the buffer */
     size_t    length;       /** Current capacity of the message box. */
 
@@ -68,7 +68,7 @@ class MessageBox {
      */
     inline void exchange() {
         if (maxLength > 0) {
-            MSG * temp = buffer0;
+            MSG *temp = buffer0;
             buffer0 = buffer1;
             buffer1 = temp;
         }

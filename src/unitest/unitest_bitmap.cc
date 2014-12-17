@@ -1,7 +1,7 @@
 /**
  * Unit test for the bitmap
- * 
- * Function: test the bitmap function with the specific case 
+ *
+ * Function: test the bitmap function with the specific case
  *
  * Created by: Ye Li (mailly1994@gmail.com)
  * Created on: 2014-11-07
@@ -17,13 +17,13 @@
 #define MAXLEN 512
 
 int get_rand(int modulo)  {
-    return rand()%modulo;
+    return rand() % modulo;
 }
 
-bool bitmap_equal_array(const cpu::Bitmap& b, bool A[], int size) {
+bool bitmap_equal_array(const cpu::Bitmap &b, bool A[], int size) {
     for (int i = 0; i < size; i++) {
         if (b.get(i) != A[i]) {
-            std::cerr <<i <<"get=" <<b.get(i) <<"array=" <<A[i] <<std::endl;
+            std::cerr << i << "get=" << b.get(i) << "array=" << A[i] << std::endl;
             return false;
         }
     }
@@ -39,11 +39,11 @@ void unitest_bitmap_operations(void) {
     cpu::Bitmap bitmap1(length1);
     cpu::Bitmap bitmap2(length2);
 
-    bool * binary_array1 = new bool[length1]();
-    bool * binary_array2 = new bool[length2]();
+    bool *binary_array1 = new bool[length1]();
+    bool *binary_array2 = new bool[length2]();
 
     // Randomly set half elements of bitmap1 and bit_array1 to 1
-    for (int i = 0; i < length1/2; i++) {
+    for (int i = 0; i < length1 / 2; i++) {
         int position = get_rand(length1);
         // DEBUG(i<<":" <<position <<"\n");
         bitmap1.set(position);
@@ -53,7 +53,7 @@ void unitest_bitmap_operations(void) {
     printf("set bitmap1\n");
 
     // Randomly set half elements of bitmap2 and bit_array2 to 1
-    for (int i = 0; i < length2/2; i++) {
+    for (int i = 0; i < length2 / 2; i++) {
         int position = get_rand(length2);
         // DEBUG(i<<":" <<position <<"\n");
         bitmap2.set(position);
@@ -65,7 +65,7 @@ void unitest_bitmap_operations(void) {
     int min = std::min(length1, length2);
     int max = std::max(length1, length2);
     cpu::Bitmap b;
-    bool * a = new bool[max]();
+    bool *a = new bool[max]();
 
     // &
     b = bitmap1 & bitmap2;
@@ -109,13 +109,13 @@ void unitest_bitmap_set_and_unset(void) {
     int length = get_rand(MAXLEN);
     printf("test set and unset with size %d\n", length);
 
-    bool * binary_array = new bool[length]();
+    bool *binary_array = new bool[length]();
     for (int i = 0; i < length; i++)
         binary_array[i] = false;
     cpu::Bitmap bitmap(length);
 
     // Randomly sets half of the elements 1
-    for (int i = 0; i < length/2; i++) {
+    for (int i = 0; i < length / 2; i++) {
         int position = get_rand(length);
         bitmap.set(position);
         binary_array[position] = true;
@@ -124,7 +124,7 @@ void unitest_bitmap_set_and_unset(void) {
     printf("set pass\n");
 
     // Randomly sets half of the elements 0
-    for (int i = 0; i < length/2; i++) {
+    for (int i = 0; i < length / 2; i++) {
         int position = get_rand(length);
         bitmap.unset(position);
         binary_array[position] = false;
@@ -133,7 +133,7 @@ void unitest_bitmap_set_and_unset(void) {
     printf("unset pass\n");
 }
 
-int main(int argc, char ** arg) {
+int main(int argc, char **arg) {
     srand(time(NULL));
     unitest_bitmap_set_and_unset();
     unitest_bitmap_operations();

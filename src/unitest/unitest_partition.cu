@@ -24,7 +24,7 @@ void print_paritition(const Partition& partition) {
     printf("\nedges: ");
     for (size_t i = 0 ; i < partition.edges.size(); i++) {
         std::cout  << i << ":" << partition.edges[i].partitionId << "-" 
-                  << partition.edges[i].id << " " ; 
+                  << partition.edges[i].localId << " " ; 
     }
     printf("\nglobalIds: ");
     for (size_t i = 0 ; i < partition.globalIds.size(); i++) {

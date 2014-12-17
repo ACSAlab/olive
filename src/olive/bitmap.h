@@ -21,11 +21,11 @@ namespace cpu {
  * A simple bitmap implementation. No bound checking so it is fast.
  */
 class Bitmap {
- private:
-    Word * words;
+private:
+    Word *words;
     int numWords;
 
- public:
+public:
     Bitmap() {
         numWords = 0;
         words = NULL;
@@ -33,15 +33,17 @@ class Bitmap {
 
     /**
      * Allocate a bitmap initalize with zeros on the heap.
-     * 
+     *
      * @param numBits number of bits in the bitmap
      */
-     explicit Bitmap(int numBits) {
+    explicit Bitmap(int numBits) {
         numWords = ((numBits - 1) >> 6) + 1;
         words = new Word[numWords]();
     }
 
-    ~Bitmap() { delete[] words; }
+    ~Bitmap() {
+        delete[] words;
+    }
 
     /** Get the capacity (number of bits) contained in this bitmap */
     int capacity() const {
@@ -50,7 +52,7 @@ class Bitmap {
 
     /**
     * Sets the bit at the specified index to 1.
-    * 
+    *
     * @param index the bit index
     */
     void set(int index) {
@@ -60,7 +62,7 @@ class Bitmap {
 
     /**
     * Sets the bit at the specified index to 0.
-    * 
+    *
     * @param index the bit index
     */
     void unset(int index) {
@@ -79,14 +81,14 @@ class Bitmap {
         return (words[index >> 6] & bitmask) != 0;
     }
 
-    /** 
+    /**
      * Deep copy a bitmap to myself
      *
      * @param other The other bitmap
      * @return      Result bitmap
      */
-     Bitmap & operator= (const Bitmap & other) {
-        Word * temp = new Word[other.numWords];
+    Bitmap &operator= (const Bitmap &other) {
+        Word *temp = new Word[other.numWords];
         memcpy(temp, other.words, other.numWords * sizeof(Word));
         if (words != NULL) {
             delete[] words;
@@ -96,13 +98,13 @@ class Bitmap {
         return * this;
     }
 
-    /** 
+    /**
      * Compute the bit-wise AND of two bitmaps and return it as result.
      *
      * @param other The other bitmap
      * @return      Result bitmap
      */
-     Bitmap operator& (const Bitmap & other) {
+    Bitmap operator& (const Bitmap &other) {
         int numBitsBigger   = std::max(capacity(), other.capacity());
         int numWordsSmaller = std::min(numWords, other.numWords);
         Bitmap newBitmap(numBitsBigger);
@@ -112,13 +114,13 @@ class Bitmap {
         return newBitmap;
     }
 
-    /** 
+    /**
      * Compute the bit-wise OR of two bitmaps and return it as result.
      *
      * @param other The other bitmap
      * @return      Result bitmap
      */
-     Bitmap operator| (const Bitmap & other) {
+    Bitmap operator| (const Bitmap &other) {
         int numBitsBigger   = std::max(capacity(), other.capacity());
         int numWordsSmaller = std::min(numWords, other.numWords);
         Bitmap newBitmap(numBitsBigger);
@@ -135,13 +137,13 @@ class Bitmap {
         return newBitmap;
     }
 
-    /** 
+    /**
      * Compute the bit-wise XOR of two bitmaps and return it as result.
      *
      * @param other The other bitmap
      * @return      Result bitmap
      */
-     Bitmap operator^ (const Bitmap &other) {
+    Bitmap operator^ (const Bitmap &other) {
         int numBitsBigger   = std::max(capacity(), other.capacity());
         int numWordsSmaller = std::min(numWords, other.numWords);
         Bitmap newBitmap(numBitsBigger);

@@ -21,7 +21,7 @@
  * e.g. out-degree, etc.
  */
 class PartitionStrategy {
- public:
+public:
     /**
      * Returns the partition number for a given vertex.
      * @param  id        Id for the vertex in graph

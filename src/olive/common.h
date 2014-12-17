@@ -19,7 +19,21 @@
 #include <assert.h>
 #include <inttypes.h>
 
+#include "cuda_runtime.h"
 
+
+class Managed {
+public:
+    void *operator new(size_t len) {
+        void *ptr;
+        cudaMallocManaged(&ptr, len);
+        return ptr;
+    }
+
+    void operator delete(void *ptr) {
+        cudaFree(ptr);
+    }
+};
 
 
 /** One word equals 64 bit. */
@@ -70,14 +84,14 @@ const int MAX_THREADS = MAX_THREADS_PER_BLOCK * MAX_BLOCKS;
  * TODO(onesuper): replace it with a method which throws an exception
  *
  */
-#define CUDA_CHECK(cuda_call)                                           \
-    do {                                                                \
-        cudaError_t err = cuda_call;                                    \
-        if (err != cudaSuccess) {                                       \
-        fprintf(stderr, "CUDA Error in file '%s' in line %i : %s.\n",   \
-                __FILE__, __LINE__, cudaGetErrorString(err));           \
-        assert(false);                                                  \
-        }                                                               \
+#define CUDA_CHECK(cuda_call)                                               \
+    do {                                                                    \
+        cudaError_t err = cuda_call;                                        \
+        if (err != cudaSuccess) {                                           \
+            fprintf(stderr, "CUDA Error in file '%s' in line %i : %s.\n",   \
+                    __FILE__, __LINE__, cudaGetErrorString(err));           \
+            assert(false);                                                  \
+        }                                                                   \
     } while (0);
 
 
