@@ -87,62 +87,35 @@ OLIVE_INC = -I$(CUDA_INC_DIR) -I$(OLIVE_DIR)
 #-------------------------------------------------------------------------------
 CUSRC   = $(wildcard $(OLIVE_DIR)/*.cu)
 CUOBJ   = $(patsubst $(OLIVE_DIR)/%.cu, $(OBJ_DIR)/%.cu.o, $(CUSRC))
-CCSRC   = $(wildcard $(OLIVE_DIR)/*.cc)
-CUOBJ   = $(patsubst $(OLIVE_DIR)/%.cc, $(OBJ_DIR)/%.cc.o, $(CCSRC))
-UTSRC   = $(wildcard $(UTEST_DIR)/*.cc)
-UTEXE   = $(patsubst $(UTEST_DIR)/%.cc, $(BIN_DIR)/%, $(UTSRC))
-UTCUSRC = $(wildcard $(UTEST_DIR)/*.cu)
-UTCUEXE = $(patsubst $(UTEST_DIR)/%.cu, $(BIN_DIR)/%, $(UTCUSRC))
-ALGOUSRC = $(wildcard $(ALGO_DIR)/*.cu)
-ALGOUEXE = $(patsubst $(ALGO_DIR)/%.cu, $(BIN_DIR)/%, $(ALGOUSRC))
+UTSRC   = $(wildcard $(UTEST_DIR)/*.cu)
+UTEXE   = $(patsubst $(UTEST_DIR)/%.cu, $(BIN_DIR)/%, $(UTSRC))
+ALGSRC  = $(wildcard $(ALGO_DIR)/*.cu)
+ALGEXE  = $(patsubst $(ALGO_DIR)/%.cu, $(BIN_DIR)/%, $(ALGSRC))
 DEPS    = $(wildcard $(OLIVE_DIR)/*.h)
 
 
 #-------------------------------------------------------------------------------
 # Fake Targets
 #-------------------------------------------------------------------------------
-.PHONY: clean clean-bin clean-all libolive objects
+.PHONY: clean clean-bin clean-all unitests algos
 
 all: 
 
 
 #-------------------------------------------------------------------------------
-# Archive olive static library
-#-------------------------------------------------------------------------------
-libolive: $(LIB_DIR) objects
-	@echo "Creating library: " $@
-	@ar -r -u $@ $(CUOBJS)
-
-
-#-------------------------------------------------------------------------------
-# Target/common rule for building olive codes
-#-------------------------------------------------------------------------------
-objects: $(OBJ_DIR) $(CUOBJ) $(CCOBJ)
-
-$(CUOBJ): $(OBJ_DIR)/%.cu.o: $(OLIVE_DIR)/%.cu $(DEPS)
-	$(NVCC) -o $@ $< $(NVCCFLAGS) -I$(CUDA_INC_DIR) -I$(OLIVE_DIR) -c
-
-$(CCOBJ): $(OBJ_DIR)/%.cc.o: $(OLIVE_DIR)/%.cc $(DEPS)
-	$(CC) -o $@ $< $(CCFLAGS)  -I$(OLIVE_DIR) -c
-
-
-#-------------------------------------------------------------------------------
 # Rules for unitest (unitest/%.cc => bin/%)
 #-------------------------------------------------------------------------------
-unitests: $(BIN_DIR) $(UTEXE) $(UTCUEXE)
+unitests: $(BIN_DIR) $(UTEXE)
 
-$(UTEXE): $(BIN_DIR)/%: $(UTEST_DIR)/%.cc $(DEPS) 
-	$(CC) -o $@ $< $(CCFLAGS) $(OLIVE_INC) -L$(CUDA_LIB_DIR) -lcudart
-
-$(UTCUEXE): $(BIN_DIR)/%: $(UTEST_DIR)/%.cu $(DEPS) 
+$(UTEXE): $(BIN_DIR)/%: $(UTEST_DIR)/%.cu $(DEPS) 
 	$(NVCC) -o $@ $< $(NVCCFLAGS) $(OLIVE_INC) -L$(CUDA_LIB_DIR) -lcudart
 
 #-------------------------------------------------------------------------------
 # Rules for algorithm
 #-------------------------------------------------------------------------------
-algos: $(BIN_DIR) $(ALGOUEXE)
+algos: $(BIN_DIR) $(ALGEXE)
 
-$(ALGOUEXE): $(BIN_DIR)/%: $(ALGO_DIR)/%.cu $(DEPS) 
+$(ALGEXE): $(BIN_DIR)/%: $(ALGO_DIR)/%.cu $(DEPS) 
 	$(NVCC) -o $@ $< $(NVCCFLAGS) $(OLIVE_INC) -L$(CUDA_LIB_DIR) -lcudart
 
 #-------------------------------------------------------------------------------
