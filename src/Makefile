@@ -79,9 +79,8 @@ endif
 #-------------------------------------------------------------------------------
 # Includes & Libraries
 #-------------------------------------------------------------------------------
-INC = -I$(CUDA_INC_DIR) -I$(OLIVE_DIR)
-LIB = -L$(CUDA_LIB_DIR)
-DLL = -lcudart
+OLIVE_INC = -I$(CUDA_INC_DIR) -I$(OLIVE_DIR)
+
 
 #-------------------------------------------------------------------------------
 # Generates the name lists for building
@@ -121,10 +120,10 @@ libolive: $(LIB_DIR) objects
 objects: $(OBJ_DIR) $(CUOBJ) $(CCOBJ)
 
 $(CUOBJ): $(OBJ_DIR)/%.cu.o: $(OLIVE_DIR)/%.cu $(DEPS)
-	$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) -c
+	$(NVCC) -o $@ $< $(NVCCFLAGS) -I$(CUDA_INC_DIR) -I$(OLIVE_DIR) -c
 
 $(CCOBJ): $(OBJ_DIR)/%.cc.o: $(OLIVE_DIR)/%.cc $(DEPS)
-	$(CC) -o $@ $< $(CCFLAGS) $(INC) -c
+	$(CC) -o $@ $< $(CCFLAGS)  -I$(OLIVE_DIR) -c
 
 
 #-------------------------------------------------------------------------------
@@ -133,18 +132,18 @@ $(CCOBJ): $(OBJ_DIR)/%.cc.o: $(OLIVE_DIR)/%.cc $(DEPS)
 unitests: $(BIN_DIR) $(UTEXE) $(UTCUEXE)
 
 $(UTEXE): $(BIN_DIR)/%: $(UTEST_DIR)/%.cc $(DEPS) 
-	$(CC) -o $@ $< $(CCFLAGS) $(INC) $(LIB) $(DLL)
+	$(CC) -o $@ $< $(CCFLAGS) $(OLIVE_INC) -L$(CUDA_LIB_DIR) -lcudart
 
 $(UTCUEXE): $(BIN_DIR)/%: $(UTEST_DIR)/%.cu $(DEPS) 
-	$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) $(LIB) $(DLL)
+	$(NVCC) -o $@ $< $(NVCCFLAGS) $(OLIVE_INC) -L$(CUDA_LIB_DIR) -lcudart
 
 #-------------------------------------------------------------------------------
-# Rules for algo
+# Rules for algorithm
 #-------------------------------------------------------------------------------
 algos: $(BIN_DIR) $(ALGOUEXE)
 
 $(ALGOUEXE): $(BIN_DIR)/%: $(ALGO_DIR)/%.cu $(DEPS) 
-	$(NVCC) -o $@ $< $(NVCCFLAGS) $(INC) $(LIB) $(DLL)
+	$(NVCC) -o $@ $< $(NVCCFLAGS) $(OLIVE_INC) -L$(CUDA_LIB_DIR) -lcudart
 
 #-------------------------------------------------------------------------------
 # Rules for build directories

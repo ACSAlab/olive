@@ -3,12 +3,13 @@
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-10-28
- * Last Modified: 2014-11-04
+ * Last Modified: 2014-12-18
  */
 
 #include "partition.h"
 #include "algo_common.h"
 #include "bfs_top_down.h"
+#include "bfs_serial.h"
 
 int main(int argc, char **argv) {
 
@@ -27,11 +28,11 @@ int main(int argc, char **argv) {
     Partition par;
     par.fromSubgraph(subgraphs[0]);
 
-    auto levels = bfs_top_down(par, graph.nodes());
+    auto top_down_levels = bfs_top_down(par, graph.nodes(), 0);
+    auto serial_levels = bfs_top_down(par, graph.nodes(), 0);
 
-    // for (int i = 0; i < levels.size(); i++) {
-    //     printf("%d ", levels[i]);
-    // }
+    expect_equal(top_down_levels, serial_levels);
 
+    printf("Hopefully, nothing goes wrong.");
     return 0;
 }

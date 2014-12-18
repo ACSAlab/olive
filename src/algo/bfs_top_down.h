@@ -1,4 +1,11 @@
-
+/**
+ * The top-down bfs use a bitmask as a immediate representation of the 
+ * working set. It is based on a single partition of a graph.
+ *
+ * Author: Yichao Cheng (onesuperclark@gmail.com)
+ * Created on: 2014-12-17
+ * Last Modified: 2014-12-18
+ */
 
 #include <vector>
 
@@ -26,7 +33,6 @@ void queue2mask(
     }
 }
 
-
 __global__
 void mask2queue(
     size_t n,
@@ -43,20 +49,17 @@ void mask2queue(
     }
 }
 
-
-std::vector<int> bfs_top_down(const Partition &par, VertexId n) {
+std::vector<int> bfs_top_down(const Partition &par, VertexId nodes, VertexId source) {
     GRD<int> levels;
-    levels.reserve(n);
+    levels.reserve(nodes);
     levels.allTo(INF);
-    levels.set(0, 0);
 
     GRD<int> mask;
-    mask.reserve(n);
+    mask.reserve(nodes);
     mask.allTo(0);
 
     GRD<VertexId> queue;
-    queue.reserve(n);
-    queue.set(0, VertexId (0));
+    queue.reserve(nodes);
 
     int *queueSize;
     queueSize = (int *) malloc(sizeof(int));
@@ -67,6 +70,8 @@ std::vector<int> bfs_top_down(const Partition &par, VertexId n) {
     CUDA_CHECK(H2D(queueSize_d, queueSize, sizeof(int)));
 
     int curLevel = 0;
+    levels.set(source, 0);
+    queue.set(0, source);
     while (true) {
 
         CUDA_CHECK(D2H(queueSize, queueSize_d, sizeof(int)));
@@ -98,9 +103,9 @@ std::vector<int> bfs_top_down(const Partition &par, VertexId n) {
         *queueSize = 0;
         CUDA_CHECK(H2D(queueSize_d, queueSize, sizeof(int)));
 
-        config = util::kernelConfig(n);
+        config = util::kernelConfig(nodes);
         mask2queue <<< config.first, config.second>>>(
-            n,
+            nodes,
             mask.elemsDevice,
             queue.elemsDevice,
             queueSize_d);
@@ -109,6 +114,7 @@ std::vector<int> bfs_top_down(const Partition &par, VertexId n) {
     }
 
     levels.persist();
-    return std::vector<int>(levels.elemsHost, levels.elemsHost + n);
+    // Return the `levels` array
+    return std::vector<int>(levels.elemsHost, levels.elemsHost + nodes);
 }
 
