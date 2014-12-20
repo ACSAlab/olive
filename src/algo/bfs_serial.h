@@ -11,9 +11,14 @@
 #include <deque>
 
 /**
- * The following algorithm comes from CLRS
+ * The following algorithm comes from CLRS.
+ *
+ * @param partition The graph partition
+ * @param nodes     The number of nodes in the graph.
+ * @param source    The source node to traverse from.
+ * @return a vector containing the BFS level for each node.
  */
-std::vector<int> bfs_serial(const Partition &par, VertexId nodes, VertexId source) {
+std::vector<int> bfs_serial(const Partition &partition, VertexId nodes, VertexId source) {
 
     GRD<int> levels;
     levels.reserve(nodes);
@@ -24,20 +29,19 @@ std::vector<int> bfs_serial(const Partition &par, VertexId nodes, VertexId sourc
     visited.allTo(0);
 
     std::deque<VertexId> current;
-
+    current.push_back(source);
     levels.set(source, 0);
     visited.set(source, 1);
-    current.push_back(source);
 
     while(!current.empty()) {
         // Dequeue
         VertexId outNode = current.front();
         current.pop_front();
 
-        EdgeId first = par.vertices[outNode];
-        EdgeId last = par.vertices[outNode+1];
+        EdgeId first = partition.vertices[outNode];
+        EdgeId last = partition.vertices[outNode+1];
         for (EdgeId edge = first; edge < last; edge ++) {
-            VertexId inNode = par.edges[edge].localId;
+            VertexId inNode = partition.edges[edge].localId;
             if (visited[inNode] == 0) {
                 levels[inNode] = levels[outNode] + 1; 
                 current.push_back(inNode);

@@ -9,6 +9,11 @@
 
 #include <vector>
 
+
+/**
+ * The following kernel expands from a queue and collects the destination
+ * nodes in a O(N) bit mask (array).
+ */
 __global__
 void queue2mask(
     const EdgeId *vertices,
@@ -33,6 +38,9 @@ void queue2mask(
     }
 }
 
+/**
+ * The following kernel compacts the bit mask to a queue.
+ */
 __global__
 void mask2queue(
     size_t n,
@@ -49,6 +57,14 @@ void mask2queue(
     }
 }
 
+/**
+ * The following algorithm use a queue/bitmask strategy.
+ * 
+ * @param partition The graph partition
+ * @param nodes     The number of nodes in the graph.
+ * @param source    The source node to traverse from.
+ * @return a vector containing the BFS level for each node.
+ */
 std::vector<int> bfs_top_down(const Partition &par, VertexId nodes, VertexId source) {
     GRD<int> levels;
     levels.reserve(nodes);
