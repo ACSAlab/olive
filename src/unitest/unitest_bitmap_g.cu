@@ -6,7 +6,7 @@
  */
 
 #include "bitmap_g.h"
-#include <iostream>
+#include "unitest_common.h"
 
 #define SIZE 500
 
@@ -24,16 +24,6 @@ void Kernel_by_pointer(gpu::Bitmap * bitmap) {
 		bitmap->unset(threadIdx.x);
 }
 
-bool bitmap_equal_array(const gpu::Bitmap& b, bool A[], int size) {
-	int i;
-    for (i = 0; i < size; i++) {
-        if (b.get(i) != A[i]) {
-            std::cerr <<i <<"get=" <<b.get(i) <<"array=" <<A[i] <<std::endl;
-            return false;
-        }
-    }
-    return true;
-}
 
 int main() {
 	gpu::Bitmap *bitmap = new gpu::Bitmap(SIZE);

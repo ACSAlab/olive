@@ -7,10 +7,10 @@
  * Last Modified: 2014-11-23
  */
 
-#include "unitest_common.h"
-#include "partition.h"
-
 #include <iostream>
+
+#include "partition.h"
+#include "unitest_common.h"
 
 void print_paritition(const Partition& partition) {
 
@@ -46,7 +46,6 @@ int main(int argc, char ** argv) {
     graph.printOutEdges();
     graph.printGhostVertices();
 
-
     RandomEdgeCut random;
     auto subgraphs = graph.partitionBy(random, numParts);
     for (int i = 0; i < numParts; i++) {
@@ -62,7 +61,6 @@ int main(int argc, char ** argv) {
         par[i].fromSubgraph(subgraphs[i]);
         print_paritition(par[i]);
     }
-
 
     return 0;
 }

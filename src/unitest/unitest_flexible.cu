@@ -11,9 +11,8 @@
 #include <vector>
 
 #include "flexible.h"
-#include "unitest_common.h"
 #include "partition_strategy.h"
-
+#include "unitest_common.h"
 
 void unitest_sort_and_shuffle(flex::Graph<int, int> &graph) {
     std::cout << "print Scatter after sort\n";

@@ -12,22 +12,13 @@
 #include <algorithm>
 
 #include "bitmap.h"
+#include "unitest_common.h"
 
 #define DEBUG(a) std::cout <<"\033[31;1m" <<a <<"\033[0m"
 #define MAXLEN 512
 
 int get_rand(int modulo)  {
     return rand() % modulo;
-}
-
-bool bitmap_equal_array(const cpu::Bitmap &b, bool A[], int size) {
-    for (int i = 0; i < size; i++) {
-        if (b.get(i) != A[i]) {
-            std::cerr << i << "get=" << b.get(i) << "array=" << A[i] << std::endl;
-            return false;
-        }
-    }
-    return true;
 }
 
 /* test operations on randomly generated bitmaps and binary_arrays */

@@ -29,9 +29,7 @@ void verifyMsgs(int * buffer) {
  */
 int main(int argc, char ** argv) {
 
-
     util::enableAllPeerAccess();
-
     MessageBox<int> msgbox1;
     MessageBox<int> msgbox2;
 

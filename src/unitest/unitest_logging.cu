@@ -7,9 +7,8 @@
  * Last Modified: 2014-11-15
  */
 
-#include "unitest_common.h"
 #include "logging.h"
-
+#include "unitest_common.h"
 
 void all_levels(void) {
     Logging().Get(ERROR) << "error: " << 1;
