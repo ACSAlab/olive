@@ -1,9 +1,8 @@
 /**
- * A simple bit set implementation on CPU.
+ * bitmap class declaration, GPU supported
  *
- * Author: Yichao Cheng (onesuperclark@gmail.com)
- * Created on: 2014-11-05
- * Last Modified: 2014-11-05
+ * Created on 2014-11-29
+ * Last modified on 2014-11-30
  */
 
 #ifndef BITMAP_H
@@ -12,73 +11,82 @@
 #include <algorithm>
 
 #include "common.h"
-#include "utils.h"
 
-
-namespace cpu {
-
-/**
- * A simple bitmap implementation. No bound checking so it is fast.
- */
-class Bitmap {
+class Bitmap : public Managed {
 private:
     Word *words;
     int numWords;
 
 public:
-    Bitmap() {
-        numWords = 0;
-        words = NULL;
-    }
+    Bitmap() : words(NULL), numWords(0) {}
 
     /**
-     * Allocate a bitmap initalize with zeros on the heap.
+     * Allocate a bitmap initalize with zeros on unified memory
      *
-     * @param numBits number of bits in the bitmap
+     * @param  numBits [number of bits in the bitmap]
      */
     explicit Bitmap(int numBits) {
         numWords = ((numBits - 1) >> 6) + 1;
-        words = new Word[numWords]();
+        cudaMallocManaged(&words, numWords * sizeof(Word));
+        memset(words, 0, numWords * sizeof(Word));
     }
-
     ~Bitmap() {
-        delete[] words;
-    }
-
-    /** Get the capacity (number of bits) contained in this bitmap */
-    int capacity() const {
-        return numWords << 6;
+        cudaFree(words);
     }
 
     /**
-    * Sets the bit at the specified index to 1.
-    *
-    * @param index the bit index
-    */
+     * Sets the bit at the specified index to 1. Both host and device side
+     *
+     * @param index [the bit index]
+     */
+    inline __host__ __device__
     void set(int index) {
         Word bitmask = static_cast<Word>(1) << (index & 0x3f);
+#ifdef __CUDA_ARCH__
+        atomicOr(
+            reinterpret_cast<unsigned long long *>(&words[index >> 6]),
+            static_cast<unsigned long long>(bitmask) );
+#else
         words[index >> 6] |= bitmask;
+#endif
     }
 
     /**
-    * Sets the bit at the specified index to 0.
-    *
-    * @param index the bit index
-    */
+     * Sets the bit at the specified index to 0. Both host and device side
+     *
+     * @param index [the bit index]
+     */
+    inline __host__ __device__
     void unset(int index) {
         Word bitmask = static_cast<Word>(1) << (index & 0x3f);
+#ifdef __CUDA_ARCH__
+        atomicAnd(
+            reinterpret_cast<unsigned long long *>(&words[index >> 6]),
+            static_cast<unsigned long long>(~bitmask) );
+#else
         words[index >> 6] &= ~bitmask;
+#endif
     }
 
     /**
      * Get the bit with the specified index.
      *
      * @param index The bit index
-     * @return      True if the bit is currently set
+     * @return  [True if the bit is currently set]
      */
+    inline __host__ __device__
     bool get(int index) const {
         Word bitmask = static_cast<Word>(1) << (index & 0x3f);
         return (words[index >> 6] & bitmask) != 0;
+    }
+
+    /**
+     * Get the capacity (number of bits) contained in this bitmap
+     * @return  [the capacity]
+     */
+    inline __host__ __device__
+    int capacity(void) const {
+        return numWords << 6;
     }
 
     /**
@@ -160,7 +168,5 @@ public:
         return newBitmap;
     }
 };
-
-}  // namespace cpu
 
 #endif  // BITMAP_H

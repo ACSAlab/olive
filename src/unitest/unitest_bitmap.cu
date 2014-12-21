@@ -14,48 +14,40 @@
 #include "bitmap.h"
 #include "unitest_common.h"
 
-#define DEBUG(a) std::cout <<"\033[31;1m" <<a <<"\033[0m"
 #define MAXLEN 512
 
-int get_rand(int modulo)  {
-    return rand() % modulo;
-}
-
 /* test operations on randomly generated bitmaps and binary_arrays */
-void unitest_bitmap_operations(void) {
+void unitest_bitmap_cpu() {
     int length1 = get_rand(MAXLEN);
     int length2 = get_rand(MAXLEN);
-    printf("test bit operation with size %d and %d\n", length1, length2);
+    printf("test bit operation on CPU with size %d (bitmap1) and %d (bitmap2):\n", length1, length2);
 
-    cpu::Bitmap bitmap1(length1);
-    cpu::Bitmap bitmap2(length2);
-
+    Bitmap bitmap1(length1);
+    Bitmap bitmap2(length2);
     bool *binary_array1 = new bool[length1]();
     bool *binary_array2 = new bool[length2]();
 
     // Randomly set half elements of bitmap1 and bit_array1 to 1
     for (int i = 0; i < length1 / 2; i++) {
         int position = get_rand(length1);
-        // DEBUG(i<<":" <<position <<"\n");
         bitmap1.set(position);
         binary_array1[position] = true;
     }
     assert(bitmap_equal_array(bitmap1, binary_array1, length1));
-    printf("set bitmap1\n");
+    printf("set bitmap1 pass\n");
 
     // Randomly set half elements of bitmap2 and bit_array2 to 1
     for (int i = 0; i < length2 / 2; i++) {
         int position = get_rand(length2);
-        // DEBUG(i<<":" <<position <<"\n");
         bitmap2.set(position);
         binary_array2[position] = true;
     }
     assert(bitmap_equal_array(bitmap2, binary_array2, length2));
-    printf("set bitmap2\n");
+    printf("set bitmap2 pass\n");
 
     int min = std::min(length1, length2);
     int max = std::max(length1, length2);
-    cpu::Bitmap b;
+    Bitmap b;
     bool *a = new bool[max]();
 
     // &
@@ -64,7 +56,7 @@ void unitest_bitmap_operations(void) {
         a[i] = binary_array1[i] && binary_array2[i];
     }
     assert(bitmap_equal_array(b, a, max));
-    printf("and pass\n");
+    printf("bitmap1 & bitmap2 pass\n");
 
     // |
     b = bitmap1 | bitmap2;
@@ -78,7 +70,7 @@ void unitest_bitmap_operations(void) {
         a[i] = binary_array2[i];
     }
     assert(bitmap_equal_array(b, a, max));
-    printf("or pass\n");
+    printf("bitmap1 or bitmap2 pass\n");
 
     // ^
     b = bitmap1 ^ bitmap2;
@@ -92,42 +84,50 @@ void unitest_bitmap_operations(void) {
         a[i] = binary_array2[i];
     }
     assert(bitmap_equal_array(b, a, max));
-    printf("xor pass\n");
+    printf("bitmap1 ^ bitmap2 pass\n");
 }
 
-/* randomly set and unset bitmap and compare it with the binary array */
-void unitest_bitmap_set_and_unset(void) {
+__global__
+void Kernel_by_pointer(Bitmap *bitmap) {
+    if (threadIdx.x % 3 == 0)
+        bitmap->set(threadIdx.x);
+    if (threadIdx.x % 2 == 0)
+        bitmap->unset(threadIdx.x);
+}
+
+void unitest_bitmap_gpu() {
     int length = get_rand(MAXLEN);
-    printf("test set and unset with size %d\n", length);
-
+    Bitmap *bitmap = new Bitmap(length);
     bool *binary_array = new bool[length]();
-    for (int i = 0; i < length; i++)
-        binary_array[i] = false;
-    cpu::Bitmap bitmap(length);
+    printf("test bit operation on GPU with size %d:\n", length);
 
-    // Randomly sets half of the elements 1
+    // Randomly set half elements of bitmap to 1
     for (int i = 0; i < length / 2; i++) {
         int position = get_rand(length);
-        bitmap.set(position);
+        bitmap->set(position);
         binary_array[position] = true;
     }
-    assert(bitmap_equal_array(bitmap, binary_array, length));
+    // set and unset on CPU side is working
+    assert(bitmap_equal_array(*bitmap, binary_array, length));
     printf("set pass\n");
 
-    // Randomly sets half of the elements 0
-    for (int i = 0; i < length / 2; i++) {
-        int position = get_rand(length);
-        bitmap.unset(position);
-        binary_array[position] = false;
+    Kernel_by_pointer <<< 1, length >>>(bitmap);
+    cudaDeviceSynchronize();
+    for (int i = 0; i < length; i++) {
+        if (i % 3 == 0)
+            binary_array[i] = true;
+        if (i % 2 == 0)
+            binary_array[i] = false;
     }
-    assert(bitmap_equal_array(bitmap, binary_array, length));
-    printf("unset pass\n");
+    // the atomic set and unset on GPU is working
+    assert(bitmap_equal_array(*bitmap, binary_array, length) );
+    printf("set and unset pass\n");
 }
 
 int main(int argc, char **arg) {
     srand(time(NULL));
-    unitest_bitmap_set_and_unset();
-    unitest_bitmap_operations();
+    unitest_bitmap_cpu();
+    unitest_bitmap_gpu();
     printf("Hopefully, all cases passed\n");
     return 0;
 }

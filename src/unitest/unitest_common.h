@@ -10,8 +10,14 @@
 #include <assert.h>
 #include <time.h>
 
+#include <iostream>
+#include "bitmap.h"
 
- bool bitmap_equal_array(const cpu::Bitmap &b, bool A[], int size) {
+int get_rand(int modulo)  {
+    return rand() % modulo;
+}
+
+ bool bitmap_equal_array(const Bitmap &b, bool A[], int size) {
     for (int i = 0; i < size; i++) {
         if (b.get(i) != A[i]) {
             std::cerr << i << "get=" << b.get(i) << "array=" << A[i] << std::endl;
