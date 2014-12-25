@@ -43,23 +43,23 @@ int main(int argc, char ** argv) {
     flex::Graph<int, int> graph;
     PartitionId numParts = atoi(argv[2]);
     graph.fromEdgeListFile(argv[1]);
-    graph.printOutEdges();
-    graph.printGhostVertices();
+    // graph.printOutEdges();
+    // graph.printGhostVertices();
 
     RandomEdgeCut random;
     auto subgraphs = graph.partitionBy(random, numParts);
     for (int i = 0; i < numParts; i++) {
         std::cout << "\n****\n"<< "Subgraph: " << subgraphs[i].partitionId
             << "/" << subgraphs[i].numParts << std::endl;
-        subgraphs[i].printOutEdges();
-        subgraphs[i].printGhostVertices();
-        subgraphs[i].printInEdges();
+        // subgraphs[i].printOutEdges();
+        // subgraphs[i].printGhostVertices();
+        // subgraphs[i].printInEdges();
     }
 
     Partition par[4];
     for (int i = 0; i < numParts; i++) {
         par[i].fromSubgraph(subgraphs[i]);
-        print_paritition(par[i]);
+        // print_paritition(par[i]);
     }
 
     return 0;

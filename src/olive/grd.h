@@ -9,7 +9,7 @@
 #ifndef GRD_H
 #define GRD_H
 
-#include "logging.h"
+#include "common.h"
 
 /**
  * GPU-Resident Dataset (GRD) provides the utility for allocating data buffers

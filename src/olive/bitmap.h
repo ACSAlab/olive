@@ -1,6 +1,10 @@
 /**
  * bitmap class declaration, GPU supported
  *
+ * Authors:
+ *      Yichao Cheng (onesuperclark@gmail.com)
+ *      Ye Li (mailly1994@gmail.com)
+ *
  * Created on 2014-11-29
  * Last modified on 2014-11-30
  */

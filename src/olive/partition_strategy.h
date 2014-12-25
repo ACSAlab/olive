@@ -27,10 +27,7 @@ public:
      * @param  numParts  Number of parts to partition
      * @return           The partition number for a given vertex
      */
-    virtual
-    PartitionId getPartition(VertexId id, PartitionId numParts) const {
-        return 0;
-    }
+    virtual PartitionId getPartition(VertexId id, PartitionId numParts) const = 0;
 };
 
 class RandomEdgeCut: public PartitionStrategy {

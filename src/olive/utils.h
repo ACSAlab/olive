@@ -102,8 +102,6 @@ void disableAllPeerAccess() {
     }
 }
 
-
-
 /**
  * Checks if the string is a numeric number
  * @param  str String to check

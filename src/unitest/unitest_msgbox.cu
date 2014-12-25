@@ -40,14 +40,14 @@ int main(int argc, char ** argv) {
 
     // Set data on device 0
     CUDA_CHECK(cudaSetDevice(0));
-    setUpMsgs<<<config.first, config.second>>>(msgbox1.buffer0);
+    setUpMsgs<<<config.first, config.second>>>(msgbox1.buffer);
 
     msgbox1.length = 4096;
-    msgbox2.copyMsgs(msgbox1);
+    msgbox2.recvMsgs(msgbox1);
 
     // Verify the data on device 1
     CUDA_CHECK(cudaSetDevice(1));
-    verifyMsgs<<<config.first, config.second>>>(msgbox2.buffer0);
+    verifyMsgs<<<config.first, config.second>>>(msgbox2.bufferRecv);
 
     util::disableAllPeerAccess();
 

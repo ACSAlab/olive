@@ -62,7 +62,8 @@ void mask2queue(
  * 
  * @param partition The graph partition
  * @param nodes     The number of nodes in the graph.
- * @param source    The source node to traverse from.
+ * @param source    The source node to traverse f
+rom.
  * @return a vector containing the BFS level for each node.
  */
 std::vector<int> bfs_top_down(const Partition &par, VertexId nodes, VertexId source) {
@@ -79,15 +80,16 @@ std::vector<int> bfs_top_down(const Partition &par, VertexId nodes, VertexId sou
 
     int *queueSize;
     queueSize = (int *) malloc(sizeof(int));
-    *queueSize = 1;
 
     int *queueSize_d;
     CUDA_CHECK(cudaMalloc(&queueSize_d, sizeof(int)));
-    CUDA_CHECK(H2D(queueSize_d, queueSize, sizeof(int)));
 
     int curLevel = 0;
     levels.set(source, 0);
     queue.set(0, source);
+    *queueSize = 1;
+    CUDA_CHECK(H2D(queueSize_d, queueSize, sizeof(int)));
+
     while (true) {
 
         CUDA_CHECK(D2H(queueSize, queueSize_d, sizeof(int)));

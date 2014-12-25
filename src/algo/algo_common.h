@@ -12,8 +12,8 @@
 const int INF = 0x7fffffff;
 
 
-#define H2D(dst, src, size) cudaMemcpy(dst, src, sizeof(int), cudaMemcpyHostToDevice)
-#define D2H(dst, src, size) cudaMemcpy(dst, src, sizeof(int), cudaMemcpyDeviceToHost)
+#define H2D(dst, src, size) cudaMemcpy(dst, src, size, cudaMemcpyHostToDevice)
+#define D2H(dst, src, size) cudaMemcpy(dst, src, size, cudaMemcpyDeviceToHost)
 
 
 void expect_equal(std::vector<int> v1, std::vector<int> v2) {
