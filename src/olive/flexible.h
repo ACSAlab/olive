@@ -144,11 +144,8 @@ public:
     /** Number of the partition. */
     PartitionId numParts;
 
-    /** Partition strategy. */
-    PartitionStrategy partitionStrategy;
-
     /** Constructor */
-    Graph(): partitionId(0), numParts(1), partitionStrategy() {}
+    Graph(): partitionId(0), numParts(1) {}
 
     /**
      * Returns the total vertex number in the graph.
@@ -177,12 +174,14 @@ public:
 
     /**
      * Check the existence of a vertex by specifying its `id` in O(1) time.
+     * If we can not find it in `ghostVertices`, then it is in this partition.
      *
      * @param  id   The id to look up
      * @return True if it exists
      */
     bool hasVertex(VertexId id) const {
-        return (partitionId == partitionStrategy.getPartition(id, numParts));
+        auto it = ghostVertices.find(id);
+        return (it == ghostVertices.end());
     }
 
     /**
@@ -332,25 +331,23 @@ public:
      * @return                  A vector of subgraphs
      */
     std::vector< Graph<VD, ED> > partitionBy(
-        const PartitionStrategy &strategy = RandomEdgeCut(),
-        PartitionId numParts = 1) {
+        const PartitionStrategy &strategy,
+        PartitionId numParts) {
         assert(numParts != 0);
 
         double startTime = util::currentTimeMillis();
-        // Sort before partition.
+        // Sort before partition since we want to map local id to global
         sortVerticesById();
         sortEdgesById();
         auto subgraphs = std::vector<Graph<VD, ED>>(numParts);
         for (PartitionId i = 0; i < numParts; i++) {
             subgraphs[i].partitionId = i;
             subgraphs[i].numParts = numParts;
-            subgraphs[i].partitionStrategy = strategy;
         }
         for (auto v : vertices) {
             PartitionId partitionId = strategy.getPartition(v.id, numParts);
             subgraphs[partitionId].vertices.push_back(v);
             VertexId localId = subgraphs[partitionId].vertices.size() - 1;
-            // For other partitions, treat the vertex as an ghost one.
             auto ghost = std::pair<PartitionId, VertexId>(partitionId, localId);
             for (PartitionId i = 0; i < numParts; i++) {
                 if (i == partitionId) continue;
@@ -359,7 +356,6 @@ public:
         }
         LOG(INFO) << "It took me " << util::currentTimeMillis() - startTime
                   << "ms to partition the graph.";
-
         return subgraphs;
     }
 
