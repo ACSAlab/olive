@@ -26,12 +26,12 @@ class Managed {
 public:
     void *operator new(size_t len) {
         void *ptr;
-        cudaMallocManaged(&ptr, len);
+        CUDA_CHECK(cudaMallocManaged(&ptr, len));
         return ptr;
     }
 
     void operator delete(void *ptr) {
-        cudaFree(ptr);
+        CUDA_CHECK(cudaFree(ptr));
     }
 };
 
@@ -50,6 +50,9 @@ typedef uint32_t EdgeId;
 
 /** Defines the type for the partition identifier. */
 typedef uint32_t PartitionId;
+
+
+
 
 /**
  * Constants for kernel configuration.
@@ -94,5 +97,8 @@ const int MAX_THREADS = MAX_THREADS_PER_BLOCK * MAX_BLOCKS;
         }                                                                   \
     } while (0);
 
+
+#define H2D(dst, src, size) cudaMemcpy(dst, src, size, cudaMemcpyHostToDevice)
+#define D2H(dst, src, size) cudaMemcpy(dst, src, size, cudaMemcpyDeviceToHost)
 
 #endif  // COMMON_H

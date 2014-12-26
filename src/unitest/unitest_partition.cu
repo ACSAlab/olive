@@ -8,6 +8,7 @@
  */
 
 #include <iostream>
+#include <vector>
 
 #include "partition.h"
 #include "unitest_common.h"
@@ -48,17 +49,18 @@ int main(int argc, char ** argv) {
 
     RandomEdgeCut random;
     auto subgraphs = graph.partitionBy(random, numParts);
-    for (int i = 0; i < numParts; i++) {
-        std::cout << "\n****\n"<< "Subgraph: " << subgraphs[i].partitionId
-            << "/" << subgraphs[i].numParts << std::endl;
-        // subgraphs[i].printOutEdges();
-        // subgraphs[i].printGhostVertices();
-        // subgraphs[i].printInEdges();
-    }
+    // for (int i = 0; i < numParts; i++) {
+    //     std::cout << "\n****\n"<< "Subgraph: " << subgraphs[i].partitionId
+    //         << "/" << subgraphs[i].numParts << std::endl;
+    //     subgraphs[i].printOutEdges();
+    //     subgraphs[i].printGhostVertices();
+    //     subgraphs[i].printInEdges();
+    // }
 
-    Partition par[4];
+    std::vector<Partition> pars;
+    pars.resize(numParts);
     for (int i = 0; i < numParts; i++) {
-        par[i].fromSubgraph(subgraphs[i]);
+        pars[i].fromSubgraph(subgraphs[i]);
         // print_paritition(par[i]);
     }
 

@@ -60,24 +60,23 @@ public:
      */
     void recvMsgs(const MessageBox &other, cudaStream_t stream = 0) {
         assert(other.length <= maxLength);
-        assert(other.length > 0);
-        length = other.length;
-        CUDA_CHECK(cudaMemcpyAsync(bufferRecv,
-                                   other.buffer,
-                                   other.length * sizeof(MSG),
-                                   cudaMemcpyDefault,
-                                   stream));
+        if (other.length > 0) {
+            length = other.length;
+            CUDA_CHECK(cudaMemcpyAsync(bufferRecv,
+                                       other.buffer,
+                                       other.length * sizeof(MSG),
+                                       cudaMemcpyDefault,
+                                       stream));
+        }
     }
 
     /**
      * Exchanges two buffers.
      */
     inline void swapBuffers() {
-        if (maxLength > 0) {
-            MSG *temp = buffer;
-            buffer = bufferRecv;
-            bufferRecv = temp;
-        }
+        MSG *temp = buffer;
+        buffer = bufferRecv;
+        bufferRecv = temp;
     }
 
     /** Deletes the buffer */
