@@ -19,6 +19,7 @@
 #include "utils.h"
 #include "logging.h"
 #include "message_box.h"
+#include "vertex_message.h"
 
 /**
  * Managing the resource for each GPU-resident graph partition.
@@ -35,34 +36,9 @@
  * in a graph partition. e.g. The ids are continuous from 0 to `vertices`-1;
  *
  */
+template<typename MessageValue>
 class Partition {
 public:
-    /**
-     * If a vertex's `partitionId` equals the partition's `partitionId`, then it
-     * refers to a local vertex. Otherwise `localId` refers to a remote one.
-     */
-    class Vertex {
-    public:
-        PartitionId  partitionId;
-        VertexId     localId;
-        explicit Vertex(): partitionId(0), localId(0) {}
-        explicit Vertex(PartitionId pid, VertexId id): partitionId(pid), localId(id) {}
-    };
-
-    /**
-     * Stub information sending to a remote vertex.
-     * @note `id` here is .
-     */
-    class Stub {
-    public:
-        VertexId   localId; /** Specifying the remote vertex by its local id. */
-        void      *message; /** Content of the message. */
-
-        /** reserved for the printing on CPU. */
-        void print() {
-            printf("%d:%lld  ", localId, reinterpret_cast<long long int> (message));
-        }
-    };
 
     /** Partition identification. Obtained via a pass-in subgraph */
     PartitionId    partitionId;
@@ -77,8 +53,8 @@ public:
     VertexId       vertexCount;
     EdgeId         edgeCount;
 
-    /** 
-     * Record local algorithm-specific state in each partition. 
+    /**
+     * Record local algorithm-specific state in each partition.
      * The memory is allocated later in the user-defined function.
      */
     void          *algoState;
@@ -133,12 +109,12 @@ public:
      * reserved for the local partition (do not allocate memory).
      * e.g. for partition 2, outboxes[0/1/3] is effective.
      */
-    MessageBox<Stub> *outboxes;
+    MessageBox< VertexMessage<MessageValue> > *outboxes;
 
     /**
      * Messages received from remote vertices.
      */
-    MessageBox<Stub> *inboxes;
+    MessageBox< VertexMessage<MessageValue> > *inboxes;
 
     /**
      * Enables overlapped communication and computation.
@@ -150,8 +126,8 @@ public:
     /**
      * Measures the execution time of a certain kernel.
      */
-    cudaEvent_t     startEvent;
-    cudaEvent_t     endEvent;
+    cudaEvent_t     startEvents[4];
+    cudaEvent_t     endEvents[4];
 
     /**
      * Constructor
@@ -168,8 +144,10 @@ public:
         workqueueSizeDevice = NULL;
         streams[0] = NULL;
         streams[1] = NULL;
-        startEvent = NULL;
-        endEvent = NULL;
+        for (int i = 0; i < 4; i++) {
+            startEvents[i] = NULL;
+            endEvents[i] = NULL;
+        }
     }
 
     /**
@@ -202,8 +180,11 @@ public:
         CUDA_CHECK(cudaSetDevice(deviceId));
         CUDA_CHECK(cudaStreamCreate(&streams[0]));
         CUDA_CHECK(cudaStreamCreate(&streams[1]));
-        CUDA_CHECK(cudaEventCreate(&startEvent));
-        CUDA_CHECK(cudaEventCreate(&endEvent));
+
+        for (int i = 0; i < 4; i++) {
+            CUDA_CHECK(cudaEventCreate(&startEvents[i]));
+            CUDA_CHECK(cudaEventCreate(&endEvents[i]));
+        }
 
         // Allocate the memory for the buffers on CPU and GPU
         vertices.reserve(vertexCount + 1, deviceId);
@@ -285,10 +266,12 @@ public:
         if (inboxes) CUDA_CHECK(cudaFreeHost(inboxes));
         if (streams[0]) CUDA_CHECK(cudaStreamDestroy(streams[0]));
         if (streams[1]) CUDA_CHECK(cudaStreamDestroy(streams[1]));
-        if (startEvent) CUDA_CHECK(cudaEventDestroy(startEvent));
-        if (endEvent)   CUDA_CHECK(cudaEventDestroy(endEvent));
         if (workqueueSize) free(workqueueSize);
         if (workqueueSizeDevice) CUDA_CHECK(cudaFree(workqueueSizeDevice));
+        for (int i = 0; i < 4; i++) {
+            if (startEvents[i]) CUDA_CHECK(cudaEventDestroy(startEvents[i]));
+            if (endEvents[i])   CUDA_CHECK(cudaEventDestroy(endEvents[i]));
+        }
     }
 
     // Returns the address of a neighbors' state by giving a Vertex value. if
@@ -333,13 +316,12 @@ private:
         // The pointers are allocated in pinned memory so that they can be
         // accessed as outboxes[i]
         CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **> (&outboxes),
-                                  sizeof(MessageBox<Stub>) * numParts,
+                                  sizeof(MessageBox< VertexMessage<MessageValue> >) * numParts,
                                   cudaHostAllocPortable));
         CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **> (&inboxes),
-                                  sizeof(MessageBox<Stub>) * numParts,
+                                  sizeof(MessageBox< VertexMessage<MessageValue> >) * numParts,
                                   cudaHostAllocPortable));
-        // outboxes = new MessageBox<Stub>[numParts];
-        // inboxes = new MessageBox<Stub>[numParts];
+
         for (auto v : subgraph.vertices) {
             for (auto e : v.outEdges) {
                 if (!subgraph.hasVertex(e.id)) {

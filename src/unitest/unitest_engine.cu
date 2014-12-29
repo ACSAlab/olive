@@ -19,7 +19,7 @@ int main(int argc, char ** argv) {
         return 1;
     }
 
-    Engine engine;
+    Engine<int> engine;
     engine.init(argv[1], atoi(argv[2]));
 
     state_g.levels_h = (int *) malloc(sizeof(int) * engine.getVertexCount());

@@ -6,7 +6,7 @@
  * Last Modified: 2014-12-18
  */
 
-#include "partition.h"
+#include "engine.h"
 #include "algo_common.h"
 #include "bfs_top_down.h"
 #include "bfs_serial.h"
@@ -25,13 +25,21 @@ int main(int argc, char **argv) {
     RandomEdgeCut random;
     auto subgraphs = graph.partitionBy(random, 1);
 
-    Partition par;
+    Partition<int> par;
     par.fromSubgraph(subgraphs[0]);
-
-    auto top_down_levels = bfs_top_down(par, graph.nodes(), 0);
     auto serial_levels = bfs_top_down(par, graph.nodes(), 0);
 
-    expect_equal(top_down_levels, serial_levels);
+
+    Engine<int> engine;
+    engine.init(argv[1], 2);
+    state_g.levels_h = (int *) malloc(sizeof(int) * engine.getVertexCount());
+    engine.run();
+
+    auto dist_levels = std::vector<int>(state_g.levels_h,
+                                        state_g.levels_h + engine.getVertexCount());
+
+
+    expect_equal(serial_levels, dist_levels);
 
     printf("Hopefully, nothing goes wrong.");
     return 0;

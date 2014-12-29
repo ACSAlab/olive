@@ -13,7 +13,7 @@
 #include "partition.h"
 #include "unitest_common.h"
 
-void print_paritition(const Partition& partition) {
+void print_paritition(const Partition<int> &partition) {
 
     std::cout << "\n****\n"<< "Partition: " << partition.partitionId
         << "/" << partition.numParts << std::endl;
@@ -56,7 +56,7 @@ int main(int argc, char ** argv) {
         subgraphs[i].printGhostVertices();
     }
 
-    std::vector<Partition> pars;
+    std::vector< Partition <int> > pars;
     pars.resize(numParts);
     for (int i = 0; i < numParts; i++) {
         pars[i].fromSubgraph(subgraphs[i]);

@@ -66,7 +66,7 @@ void mask2queue(
 rom.
  * @return a vector containing the BFS level for each node.
  */
-std::vector<int> bfs_top_down(const Partition &par, VertexId nodes, VertexId source) {
+std::vector<int> bfs_top_down(const Partition<int> &par, VertexId nodes, VertexId source) {
     GRD<int> levels;
     levels.reserve(nodes);
     levels.allTo(INF);

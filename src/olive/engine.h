@@ -30,17 +30,19 @@ typedef struct {
 
 static bfs_state_t state_g = {NULL, NULL};
 
+
+template<typename MessageValue>
 __global__
 void scatterKernel(
-    MessageBox<Partition::Stub> *inbox,
+    MessageBox< VertexMessage<MessageValue> > *inbox,
     void *algoState,
     int *workset)
 {
     int tid = THREAD_INDEX;
     if (tid >= inbox->length) return;
 
-    VertexId inNode = inbox->buffer[tid].localId;
-    int remotelevel = reinterpret_cast<int> (inbox->buffer[tid].message);
+    VertexId inNode = inbox->buffer[tid].receiverId;
+    int remotelevel = inbox->buffer[tid].value;
 
     // printf("inNode=%d, levels=%d\n", inNode, local_levels[inNode]);
 
@@ -68,12 +70,13 @@ void compactKernel(
     }
 }
 
+template<typename MessageValue>
 __global__
 void expandKernel(
     PartitionId thisPid,
     const EdgeId *vertices,
-    const Partition::Vertex *edges,
-    MessageBox<Partition::Stub> *outboxes,
+    const Vertex *edges,
+    MessageBox< VertexMessage<MessageValue> > *outboxes,
     int *workset,
     VertexId *workqueue,
     int n,
@@ -97,16 +100,16 @@ void expandKernel(
             }
         } else {  // In remote partition
             size_t offset = atomicAdd(reinterpret_cast<unsigned long long *> (&outboxes[pid].length), 1);
-            Partition::Stub stub;
-            stub.localId = edges[edge].localId;
-            stub.message = reinterpret_cast<void *>(state->levels[outNode]);
-            outboxes[pid].buffer[offset] = stub;
+            VertexMessage<MessageValue> msg;
+            msg.receiverId = edges[edge].localId;
+            msg.value = state->levels[outNode];
+            outboxes[pid].buffer[offset] = msg;
         }
     }
 }
 
 // Allocate the state for each partition
-void init_bfs(Partition &part) {
+void init_bfs(Partition<int> &part) {
     bfs_state_t *state;
     CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **>(&state), sizeof(bfs_state_t)));
 
@@ -130,7 +133,7 @@ void init_bfs(Partition &part) {
     part.algoState =  state;
 }
 
-void bfs_aggregate(Partition &part) {
+void bfs_aggregate(Partition<int> &part) {
     bfs_state_t *state = (bfs_state_t *) part.algoState;
     VertexId n = part.vertexCount;
     CUDA_CHECK(D2H(state->levels_h, state->levels, sizeof(int) * n));
@@ -139,6 +142,7 @@ void bfs_aggregate(Partition &part) {
     }
 }
 
+template<typename MessageValue>
 class Engine {
 public:
     /**
@@ -200,10 +204,19 @@ public:
     void superstep() {
         LOG(DEBUG) << "************************************ Superstep " << supersteps
                    << " ************************************";
+
+        bool *expandLaunched = new bool[partitions.size()];
+        bool *scatterLaunched = new bool[partitions.size()];
+        bool *compactLaunched = new bool[partitions.size()];
+        for (int i = 0; i < partitions.size(); i++) {
+            expandLaunched[i] = false;
+            scatterLaunched[i] = false;
+            compactLaunched[i] = false;
+        }
+
         double startTime = util::currentTimeMillis();
         //////////////////////////// Computation stage /////////////////////////
-        // Before launching the kernel, scatter the local state according
-        // to the inbox's stubs.
+
         if (supersteps >= 1) {
 
 #if 0
@@ -218,40 +231,52 @@ public:
             }
 #endif
 
+            // Before launching the kernel, scatter the local state according
+            // to the inbox's messages.
             for (int i = 0; i < partitions.size(); i++) {
                 for (int j = 0; j < partitions.size(); j++) {
-                    if (partitions[i].inboxes[j].length == 0) continue;
-                    CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
+                    if (partitions[i].inboxes[j].length == 0) {
+                        continue;
+                    }
+
+                    scatterLaunched[i] = true;
 
                     LOG(DEBUG) << "Partition" << partitions[i].partitionId
                                << " launches a scatter kernel on "
                                << partitions[i].inboxes[j].length << " elements";
 
+                    CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
+                    CUDA_CHECK(cudaEventRecord(partitions[i].startEvents[0],
+                                               partitions[i].streams[1]));
                     auto config = util::kernelConfig(partitions[i].inboxes[j].length);
-                    scatterKernel <<< config.first, config.second, 0,
+                    scatterKernel<MessageValue> <<< config.first, config.second, 0,
                                   partitions[i].streams[1]>>>(
                                       &partitions[i].inboxes[j],
                                       partitions[i].algoState,
                                       partitions[i].workset.elemsDevice);
+                    CUDA_CHECK(cudaEventRecord(partitions[i].endEvents[0],
+                                               partitions[i].streams[1]));
                 }
             }
 
             // Compacting the workset back to the workqueue
             for (int i = 0; i < partitions.size(); i++) {
-                // Clear the queue before generating it
-                *partitions[i].workqueueSize = 0;
-                CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
-                CUDA_CHECK(H2D(partitions[i].workqueueSizeDevice,
-                               partitions[i].workqueueSize, sizeof(size_t)));
 
-                // DEBUG
-                // printf("p%d: ", supersteps, i);
-                // partitions[i].workset.print();
+
+                compactLaunched[i] = true;
 
                 LOG(DEBUG) << "Partition" << partitions[i].partitionId
                            << " launches a compaction kernel on "
                            << partitions[i].vertexCount << " elements";
 
+                CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
+                // Clear the queue before generating it
+                *partitions[i].workqueueSize = 0;
+                CUDA_CHECK(H2D(partitions[i].workqueueSizeDevice,
+                               partitions[i].workqueueSize, sizeof(size_t)));
+
+                CUDA_CHECK(cudaEventRecord(partitions[i].startEvents[1],
+                                           partitions[i].streams[1]));
                 auto config = util::kernelConfig(partitions[i].vertexCount);
                 compactKernel <<< config.first, config.second, 0,
                               partitions[i].streams[1]>>>(
@@ -259,6 +284,8 @@ public:
                                   partitions[i].vertexCount,
                                   partitions[i].workqueue.elemsDevice,
                                   partitions[i].workqueueSizeDevice);
+                CUDA_CHECK(cudaEventRecord(partitions[i].endEvents[1],
+                                           partitions[i].streams[1]));
             }
 
             // Transfer all the workqueueSize to host.
@@ -281,15 +308,18 @@ public:
         // return before expansion and message passing starts
         if (terminate == true) return;
 
-        bool *expandLaunched = new bool[partitions.size()];
-        for (int i = 0; i < partitions.size(); i++) {
-            expandLaunched[i] = true;
-        }
+
 
         // In each super step, launches the expand kernel for all partitions.
         // The computation kernel is launched in the stream 1.
         // Jump over the partition that has no work to perform.
         for (int i = 0; i < partitions.size(); i++) {
+
+            if (*partitions[i].workqueueSize == 0) {
+                continue;
+            }
+
+            expandLaunched[i] = true;
 
             // Clear the outboxes before we put messages to it
             for (int j = 0; j < partitions.size(); j++) {
@@ -297,21 +327,15 @@ public:
                 partitions[i].outboxes[j].clear();
             }
 
-            if (*partitions[i].workqueueSize == 0) {
-                expandLaunched[i] = false;
-                continue;
-            }
-
             LOG(DEBUG) << "Partition" << partitions[i].partitionId
                        << " launches a expansion kernel on "
                        << *partitions[i].workqueueSize << " elements";
 
             CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
-            // CUDA_CHECK(cudaEventRecord(partitions[i].startEvent,
-            //                            partitions[i].streams[1]));
-
+            CUDA_CHECK(cudaEventRecord(partitions[i].startEvents[2],
+                                       partitions[i].streams[1]));
             auto config = util::kernelConfig(*partitions[i].workqueueSize);
-            expandKernel <<< config.first, config.second, 0,
+            expandKernel<MessageValue> <<< config.first, config.second, 0,
                          partitions[i].streams[1]>>>(
                              partitions[i].partitionId,
                              partitions[i].vertices.elemsDevice,
@@ -321,9 +345,9 @@ public:
                              partitions[i].workqueue.elemsDevice,
                              *partitions[i].workqueueSize,
                              partitions[i].algoState);
+            CUDA_CHECK(cudaEventRecord(partitions[i].endEvents[2],
+                                       partitions[i].streams[1]));
 
-            // CUDA_CHECK(cudaEventRecord(partitions[i].endEvent,
-            //                            partitions[i].streams[1]));
         }
 
 
@@ -359,27 +383,54 @@ public:
             }
         }
 
-        // // Collect the execution time for each computing kernel.
-        // // Choose the lagging one to represent the computation time.
-        // double totalTime = util::currentTimeMillis() - startTime;
-        // double compTime = 0.0;
-        // float kernelTime;
-        // for (int i = 0; i < partitions.size(); i++) {
-        //     if (!expandLaunched[i]) continue;
-        //     CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
-        //     CUDA_CHECK(cudaEventElapsedTime(&kernelTime,
-        //                                     partitions[i].startEvent,
-        //                                     partitions[i].endEvent));
-        //     LOG(DEBUG) << "Partition" << partitions[i].partitionId
-        //                << ": comp=" << std::setprecision(2) << kernelTime << "ms";
-        //     if (kernelTime > compTime) compTime = kernelTime;
-        // }
+        //////////////////////////////  Profiling  /////////////////////////////
+        // Collect the execution time for each computing kernel.
+        // Choose the lagging one to represent the computation time.
+        double totalTime = util::currentTimeMillis() - startTime;
+        double maxCompTime = 0.0;
+        float compTime;
+        for (int i = 0; i < partitions.size(); i++) {
+            CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
+            float scatterTime = 0.0;
+            if (scatterLaunched[i]) {
+                CUDA_CHECK(cudaEventElapsedTime(&scatterTime,
+                                                partitions[i].startEvents[0],
+                                                partitions[i].endEvents[0]));
+            }
+            float compactTime = 0.0;
+            if (compactLaunched[i]) {
+                CUDA_CHECK(cudaEventElapsedTime(&compactTime,
+                                                partitions[i].startEvents[1],
+                                                partitions[i].endEvents[1]));
+            }
+            float expandTime = 0.0;
+            if (expandLaunched[i]) {
+                CUDA_CHECK(cudaEventElapsedTime(&expandTime,
+                                                partitions[i].startEvents[2],
+                                                partitions[i].endEvents[2]));
+            }
+            compTime = scatterTime + compactTime + expandTime;
+            LOG(DEBUG) << "Partition" << partitions[i].partitionId
+                       << ": comp=" << std::setprecision(2) << compTime << "ms"
+                       << ", scatter=" << std::setprecision(2) << scatterTime / compTime
+                       << ", compact=" << std::setprecision(2) << compactTime / compTime
+                       << ", expand=" << std::setprecision(2) << expandTime / compTime;
 
-        // double commTime = totalTime - compTime;
-        // LOG(INFO) << "Superstep" << supersteps
-        //           << ": total=" << std::setprecision(3) << totalTime << "ms"
-        //           << ", comp=" << std::setprecision(2) << compTime / totalTime
-        //           << ", comm=" << std::setprecision(2) << commTime / totalTime;
+            if (compTime > maxCompTime) maxCompTime = compTime;
+        }
+        double commTime = totalTime - maxCompTime;
+        LOG(INFO) << "Superstep" << supersteps
+                  << ": total=" << std::setprecision(3) << totalTime << "ms"
+                  << ", comp=" << std::setprecision(2) << maxCompTime / totalTime
+                  << ", comm=" << std::setprecision(2) << commTime / totalTime;
+
+        supterstepTime += totalTime;
+        supterstepCompTime += maxCompTime;
+        supterstepCommTime += commTime;
+
+        delete[] expandLaunched;
+        delete[] compactLaunched;
+        delete[] scatterLaunched;
     }
 
     // // Aggregate the local states on each partition to global states
@@ -397,8 +448,11 @@ public:
 
     ~Engine() {
         LOG (INFO) << "Profiling: "
-                   << "initAlgoState=" << std::setprecision(3) << initAlgoStateTime
-                   << "ms, aggrAlgoSate=" << std::setprecision(3) << aggrAlgoStateTime
+                   << "init=" << std::setprecision(3) << initAlgoStateTime
+                   << "ms, aggr=" << std::setprecision(3) << aggrAlgoStateTime
+                   << "ms, comp=" << std::setprecision(3) << supterstepCompTime
+                   << "ms, comm=" << std::setprecision(3) << supterstepCommTime
+                   << "ms, all=" << std::setprecision(3) << supterstepTime
                    << "ms, ";
     }
 
@@ -407,10 +461,13 @@ private:
     int         supersteps;
     bool        terminate;
     VertexId    vertexCount;
-    std::vector<Partition> partitions;
+    std::vector< Partition<MessageValue> > partitions;
     // For profiling
     double      initAlgoStateTime;
     double      aggrAlgoStateTime;
+    double      supterstepCompTime;
+    double      supterstepCommTime;
+    double      supterstepTime;
 };
 
 #endif  // ENGINE_H
