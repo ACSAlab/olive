@@ -55,19 +55,26 @@ public:
      * Uses asynchronous memory copy to hide the memory latency with computation.
      * Assumes the peer-to-peer access is already enabled.
      *
+     * If receives from an empty messagebox, the length shall be 0.
      * @param other   The message box to copy.
+     *
      * @stream stream The stream to perform this copy within.
      */
-    void recvMsgs(const MessageBox &other, cudaStream_t stream = 0) {
+    inline void recvMsgs(const MessageBox &other, cudaStream_t stream = 0) {
         assert(other.length <= maxLength);
-        if (other.length > 0) {
-            length = other.length;
-            CUDA_CHECK(cudaMemcpyAsync(bufferRecv,
-                                       other.buffer,
-                                       other.length * sizeof(MSG),
-                                       cudaMemcpyDefault,
-                                       stream));
-        }
+        // The length should also be copied asynchronously.
+        CUDA_CHECK(cudaMemcpyAsync(&length,
+                                   &other.length,
+                                   sizeof(size_t),
+                                   cudaMemcpyDefault,
+                                   stream));
+
+        CUDA_CHECK(cudaMemcpyAsync(bufferRecv,
+                                   other.buffer,
+                                   length * sizeof(MSG),
+                                   cudaMemcpyDefault,
+                                   stream));
+
     }
 
     /**
@@ -78,6 +85,18 @@ public:
         buffer = bufferRecv;
         bufferRecv = temp;
     }
+
+    inline void clear() {
+        length = 0;
+    }
+
+    inline void print() {
+        for (int i = 0; i < length; i++) {
+            buffer[i].print();
+        }
+        printf("\n");
+    }
+
 
     /** Deletes the buffer */
     void del() {

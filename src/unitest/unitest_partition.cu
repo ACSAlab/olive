@@ -49,19 +49,18 @@ int main(int argc, char ** argv) {
 
     RandomEdgeCut random;
     auto subgraphs = graph.partitionBy(random, numParts);
-    // for (int i = 0; i < numParts; i++) {
-    //     std::cout << "\n****\n"<< "Subgraph: " << subgraphs[i].partitionId
-    //         << "/" << subgraphs[i].numParts << std::endl;
-    //     subgraphs[i].printOutEdges();
-    //     subgraphs[i].printGhostVertices();
-    //     subgraphs[i].printInEdges();
-    // }
+    for (int i = 0; i < numParts; i++) {
+        std::cout << "\n****\n"<< "Subgraph: " << subgraphs[i].partitionId
+            << "/" << subgraphs[i].numParts << std::endl;
+        subgraphs[i].printOutEdges();
+        subgraphs[i].printGhostVertices();
+    }
 
     std::vector<Partition> pars;
     pars.resize(numParts);
     for (int i = 0; i < numParts; i++) {
         pars[i].fromSubgraph(subgraphs[i]);
-        // print_paritition(par[i]);
+        print_paritition(pars[i]);
     }
 
     return 0;

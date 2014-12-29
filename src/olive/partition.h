@@ -57,6 +57,11 @@ public:
     public:
         VertexId   localId; /** Specifying the remote vertex by its local id. */
         void      *message; /** Content of the message. */
+
+        /** reserved for the printing on CPU. */
+        void print() {
+            printf("%d:%lld  ", localId, reinterpret_cast<long long int> (message));
+        }
     };
 
     /** Partition identification. Obtained via a pass-in subgraph */
@@ -72,7 +77,10 @@ public:
     VertexId       vertexCount;
     EdgeId         edgeCount;
 
-    /** Record local algorithm-specific state in each partition */
+    /** 
+     * Record local algorithm-specific state in each partition. 
+     * The memory is allocated later in the user-defined function.
+     */
     void          *algoState;
     /**
      * Stores the starting indices for querying outgoing edges of local vertices
@@ -206,6 +214,7 @@ public:
         workqueueSize = static_cast<size_t *> (malloc(sizeof(size_t)));
         CUDA_CHECK(cudaMalloc(reinterpret_cast<void **> (&workqueueSizeDevice),
                               sizeof(size_t)));
+
         double allocTime = stopwatch.elapsedMillis();
 
         // `toLocal` maps the global id to local. Used to create remote vertex.
@@ -259,12 +268,12 @@ public:
         double totalTime = util::currentTimeMillis() - startTime;
         LOG(INFO) << "It took " << std::setprecision(3) << totalTime
                   << "ms to land partition" << partitionId
-                  << " on device " << deviceId << std::fixed
-                  << ", V=" << vertexCount << ", E=" << edgeCount
-                  << ", A=" << std::setprecision(1) << allocTime / totalTime
-                  << ", I=" << std::setprecision(1) << indexTime / totalTime
-                  << ", C=" << std::setprecision(1) << cacheTime / totalTime
-                  << ", M=" << std::setprecision(1) << msgboxTime / totalTime;
+                  << "(V=" << vertexCount << ", E=" << edgeCount
+                  << ") on device " << deviceId << std::fixed
+                  << ", Alloc=" << std::setprecision(1) << allocTime / totalTime
+                  << ", Index=" << std::setprecision(1) << indexTime / totalTime
+                  << ", Cache=" << std::setprecision(1) << cacheTime / totalTime
+                  << ", MsgBox=" << std::setprecision(1) << msgboxTime / totalTime;
     }
 
     /** Destructor **/

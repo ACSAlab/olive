@@ -12,27 +12,6 @@
 #include "engine.h"
 #include "unitest_common.h"
 
-// void print_paritition(const Partition& partition) {
-
-//     std::cout << "\n****\n"<< "Partition: " << partition.partitionId
-//         << "/" << partition.numParts << std::endl;
-
-//     printf("\nvertices: ");
-//     for (size_t i = 0 ; i < partition.vertices.size(); i++) {
-//         std::cout << partition.vertices[i] << " "; 
-//     }
-//     printf("\nedges: ");
-//     for (size_t i = 0 ; i < partition.edges.size(); i++) {
-//         std::cout  << i << ":" << partition.edges[i].partitionId << "-" 
-//                   << partition.edges[i].localId << " " ; 
-//     }
-//     printf("\nglobalIds: ");
-//     for (size_t i = 0 ; i < partition.globalIds.size(); i++) {
-//         std::cout << partition.globalIds[i] << " "; 
-//     }
-//     printf("\n");
-// }
-
 int main(int argc, char ** argv) {
 
     if (argc < 3) {
@@ -42,7 +21,15 @@ int main(int argc, char ** argv) {
 
     Engine engine;
     engine.init(argv[1], atoi(argv[2]));
+
+    state_g.levels_h = (int *) malloc(sizeof(int) * engine.getVertexCount());
+
     engine.run();
+
+
+    for (int i = 0; i < engine.getVertexCount(); i++) {
+        printf("%d ", state_g.levels_h[i]);
+    }
 
     return 0;
 }

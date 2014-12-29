@@ -102,6 +102,16 @@ void disableAllPeerAccess() {
     }
 }
 
+void expectOverlapOnAllDevices() {
+    int dev_count;
+    cudaDeviceProp prop;
+    cudaGetDeviceCount(&dev_count);
+    for (int i = 0; i < dev_count; i++) {
+        cudaGetDeviceProperties(&prop, i);
+        assert(prop.deviceOverlap) ;
+    }
+}
+
 /**
  * Checks if the string is a numeric number
  * @param  str String to check

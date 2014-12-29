@@ -88,6 +88,16 @@ public:
                               length * sizeof(T), cudaMemcpyDefault));
     }
 
+
+    inline void print() {
+        persist();
+        for (int i = 0; i < length; i++) {
+            printf("%d ", elemsHost[i]);
+        }
+        printf("\n");
+    }
+
+
     /**
      * Caches the dataset in GPU's on-board memory.
      */
