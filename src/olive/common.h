@@ -21,21 +21,6 @@
 
 #include "cuda_runtime.h"
 
-
-class Managed {
-public:
-    void *operator new(size_t len) {
-        void *ptr;
-        CUDA_CHECK(cudaMallocManaged(&ptr, len));
-        return ptr;
-    }
-
-    void operator delete(void *ptr) {
-        CUDA_CHECK(cudaFree(ptr));
-    }
-};
-
-
 /** One word equals 64 bit. */
 typedef uint64_t Word;
 
@@ -100,5 +85,19 @@ const int MAX_THREADS = MAX_THREADS_PER_BLOCK * MAX_BLOCKS;
 
 #define H2D(dst, src, size) cudaMemcpy(dst, src, size, cudaMemcpyHostToDevice)
 #define D2H(dst, src, size) cudaMemcpy(dst, src, size, cudaMemcpyDeviceToHost)
+
+class Managed {
+public:
+    void *operator new(size_t len) {
+        void *ptr;
+        CUDA_CHECK(cudaMallocManaged(&ptr, len));
+        return ptr;
+    }
+
+    void operator delete(void *ptr) {
+        CUDA_CHECK(cudaFree(ptr));
+    }
+};
+
 
 #endif  // COMMON_H

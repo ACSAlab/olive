@@ -36,7 +36,7 @@
  * in a graph partition. e.g. The ids are continuous from 0 to `vertices`-1;
  *
  */
-template<typename MessageValue>
+template<typename VertexValue, typename MessageValue>
 class Partition {
 public:
 
@@ -53,11 +53,6 @@ public:
     VertexId       vertexCount;
     EdgeId         edgeCount;
 
-    /**
-     * Record local algorithm-specific state in each partition.
-     * The memory is allocated later in the user-defined function.
-     */
-    void          *algoState;
     /**
      * Stores the starting indices for querying outgoing edges of local vertices
      * (vertices that in this partition).
@@ -87,6 +82,11 @@ public:
      * aggregating the final results.
      */
     GRD<VertexId>  globalIds;
+
+    /**
+     * Partition-wise vertex state values.
+     */
+    GRD<VertexValue> vertexValues;
 
     /**
      * Use a bitmap to represent the working set.
@@ -139,7 +139,6 @@ public:
         numParts = 0;
         outboxes = NULL,
         inboxes = NULL;
-        algoState = NULL;
         workqueueSize = NULL;
         workqueueSizeDevice = NULL;
         streams[0] = NULL;
@@ -190,6 +189,7 @@ public:
         vertices.reserve(vertexCount + 1, deviceId);
         edges.reserve(edgeCount, deviceId);
         globalIds.reserve(vertexCount, deviceId);
+        vertexValues.reserve(vertexCount, deviceId);
         workqueue.reserve(vertexCount, deviceId);
         workset.reserve(vertexCount, deviceId);
         workqueueSize = static_cast<size_t *> (malloc(sizeof(size_t)));

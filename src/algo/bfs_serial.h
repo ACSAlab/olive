@@ -10,6 +10,9 @@
 #include <vector>
 #include <deque>
 
+#define INF 0x7fffffff
+
+
 /**
  * The following algorithm comes from CLRS.
  *
@@ -18,7 +21,7 @@
  * @param source    The source node to traverse from.
  * @return a vector containing the BFS level for each node.
  */
-std::vector<int> bfs_serial(const Partition<int> &partition, VertexId nodes, VertexId source) {
+std::vector<int> bfs_serial(const Partition<int, int> &partition, VertexId nodes, VertexId source) {
 
     GRD<int> levels;
     levels.reserve(nodes);

@@ -6,11 +6,10 @@
  * Last Modified: 2014-12-18
  */
 
+#include <vector>
+
 #include <stdio.h>
 #include <assert.h>
-
-const int INF = 0x7fffffff;
-
 
 void expect_equal(std::vector<int> v1, std::vector<int> v2) {
     assert(v1.size() == v2.size());
