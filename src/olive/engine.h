@@ -30,16 +30,19 @@ __global__
 void scatterKernel(
     MessageBox< VertexMessage<MessageValue> > *inbox,
     VertexValue *vertexValues,
-    int *workset)
+    int *workset,
+    bool (*cond)(VertexValue),
+    VertexValue (*update)(VertexValue),
+    VertexValue (*unpack)(MessageValue))
 {
     int tid = THREAD_INDEX;
     if (tid >= inbox->length) return;
 
     VertexId inNode = inbox->buffer[tid].receiverId;
-    int remotelevel = inbox->buffer[tid].value;
+    VertexValue newValue = unpack(inbox->buffer[tid].value);
 
-    if (vertexValues[inNode].level == INF_COST) {
-        vertexValues[inNode].level = remotelevel + 1;
+    if (cond(vertexValues[inNode])) {
+        vertexValues[inNode] = update(newValue);
         workset[inNode] = 1;
     }
 }
@@ -70,7 +73,10 @@ void expandKernel(
     int *workset,
     VertexId *workqueue,
     int n,
-    VertexValue *vertexValues)
+    VertexValue *vertexValues,
+    bool (*cond)(VertexValue),
+    VertexValue (*update)(VertexValue),
+    MessageValue (*pack)(VertexValue))
 {
     int tid = THREAD_INDEX;
     if (tid >= n) return;
@@ -82,14 +88,14 @@ void expandKernel(
         PartitionId pid = edges[edge].partitionId;
         if (pid == thisPid) {  // In this partition
             VertexId inNode = edges[edge].localId;
-            if (vertexValues[inNode].level == INF_COST) {
-                vertexValues[inNode].level = vertexValues[inNode].level + 1;
+            if (cond(vertexValues[inNode])) {
+                vertexValues[inNode] = update(vertexValues[outNode]);
                 workset[inNode] = 1;
             }
         } else {  // In remote partition
             VertexMessage<MessageValue> msg;
             msg.receiverId = edges[edge].localId;
-            msg.value = vertexValues[outNode].level;
+            msg.value = pack(vertexValues[outNode]);
 
             size_t offset = atomicAdd(reinterpret_cast<unsigned long long *> (&outboxes[pid].length), 1);
             outboxes[pid].buffer[offset] = msg;
@@ -106,7 +112,7 @@ void vertexMapKernel(
 {
     int tid = THREAD_INDEX;
     if (tid >= n) return;
-    vertexValues[tid] = (*f)(vertexValues[tid]);
+    vertexValues[tid] = f(vertexValues[tid]);
 }
 
 
@@ -123,7 +129,7 @@ void vertexFilterKernel(
     int tid = THREAD_INDEX;
     if (tid >= n) return;
     if (globalIds[tid] == id) {
-        vertexValues[tid] = (*f)(vertexValues[tid]);
+        vertexValues[tid] = f(vertexValues[tid]);
         workset[tid] = 1;
     }
 }
@@ -174,9 +180,9 @@ public:
     typedef VertexValue (*VertexFunctor) (VertexValue);
 
     /**
-     * Maps a UDF `f` to each vertex.
+     * Maps a UDF `update` to each vertex.
      */
-    void vertexMap(VertexValue (*f) (VertexValue)) {
+    void vertexMap(VertexValue (*update) (VertexValue)) {
 
         for (int i = 0; i < partitions.size(); i++) {
 
@@ -189,16 +195,16 @@ public:
             vertexMapKernel <VertexValue> <<< config.first, config.second>>>(
                 partitions[i].vertexValues.elemsDevice,
                 partitions[i].vertexValues.size(),
-                f);
+                update);
             CUDA_CHECK(cudaThreadSynchronize());
         }
     }
 
     /**
-     * Maps a UDF `f` to the vertex with global `id`.
+     * Maps a UDF `update` to the vertex with global `id`.
      * The filtered out vertex will be added to the workset.
      */
-    void vertexFilter(VertexId id, VertexValue (*f)(VertexValue)) {
+    void vertexFilter(VertexId id, VertexValue (*update)(VertexValue)) {
         for (int i = 0; i < partitions.size(); i++) {
 
             LOG(DEBUG) << "Partition" << partitions[i].partitionId
@@ -212,25 +218,32 @@ public:
                 partitions[i].vertexValues.size(),
                 id,
                 partitions[i].vertexValues.elemsDevice,
-                f,
+                update,
                 partitions[i].workset.elemsDevice);
             CUDA_CHECK(cudaThreadSynchronize());
         }
     }
 
     /** Run the engine until all partition vote to quit */
-    void run() {
+    void run(bool (*cond)(VertexValue),
+             VertexValue (*update)(VertexValue),
+             MessageValue (*pack)(VertexValue),
+             VertexValue (*unpack)(MessageValue))
+    {
         supersteps = 0;
         while (true) {
             terminate = true;
-            superstep();
-            supersteps += 1;
+            superstep(cond, update, pack, unpack);
 
             if (terminate) break;
         }
     }
 
-    void superstep() {
+    void superstep(bool (*cond)(VertexValue),
+             VertexValue (*update)(VertexValue),
+             MessageValue (*pack)(VertexValue),
+             VertexValue (*unpack)(MessageValue)) 
+    {
         LOG(DEBUG) << "************************************ Superstep " << supersteps
                    << " ************************************";
 
@@ -278,7 +291,10 @@ public:
                               partitions[i].streams[1] >>> (
                                   &partitions[i].inboxes[j],
                                   partitions[i].vertexValues.elemsDevice,
-                                  partitions[i].workset.elemsDevice);
+                                  partitions[i].workset.elemsDevice,
+                                  cond,
+                                  update,
+                                  unpack);
                 CUDA_CHECK(cudaEventRecord(partitions[i].endEvents[0],
                                            partitions[i].streams[1]));
             }
@@ -358,7 +374,10 @@ public:
                              partitions[i].workset.elemsDevice,
                              partitions[i].workqueue.elemsDevice,
                              *partitions[i].workqueueSize,
-                             partitions[i].vertexValues.elemsDevice);
+                             partitions[i].vertexValues.elemsDevice,
+                             cond,
+                             update,
+                             pack);
             CUDA_CHECK(cudaEventRecord(partitions[i].endEvents[2],
                                        partitions[i].streams[1]));
 
@@ -445,6 +464,8 @@ public:
         delete[] expandLaunched;
         delete[] compactLaunched;
         delete[] scatterLaunched;
+
+        supersteps += 1;
     }
 
     // // Aggregate the local states on each partition to global states
