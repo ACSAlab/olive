@@ -1,5 +1,5 @@
 /**
- * Vertex Message
+ * Vertex message among partitions. 
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-12-29
@@ -15,7 +15,8 @@ class Vertex {
 public:
     PartitionId  partitionId;
     VertexId     localId;
-    explicit Vertex(): partitionId(0), localId(0) {}
+
+    Vertex(): partitionId(0), localId(0) {}
     explicit Vertex(PartitionId pid, VertexId id): partitionId(pid), localId(id) {}
 };
 

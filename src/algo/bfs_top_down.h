@@ -8,6 +8,7 @@
  */
 
 #include <vector>
+#include <partition.h>
 
 #define INF 0x7fffffff
 

@@ -168,7 +168,8 @@ public:
         edgeCount = subgraph.edges();
         // Only reserve memory if the graph has at least one edge/node
         if (edgeCount == 0 || vertexCount == 0) {
-            LOG(WARNING) << "parition" << partitionId << " v: " << vertexCount << ", e: " << edgeCount;
+            LOG(WARNING) << "Parition" << partitionId << " #vertices= "
+            << vertexCount << ", #edges= " << edgeCount;
         }
 
         double startTime = util::currentTimeMillis();
@@ -198,7 +199,7 @@ public:
 
         double allocTime = stopwatch.elapsedMillis();
 
-        // `toLocal` maps the global id to local. Used to create remote vertex.
+        // Maps the global ids to local ids. Used to create remote vertex.
         std::map<VertexId, VertexId> toLocal;
         VertexId localId = 0;
         for (auto v : subgraph.vertices) {
@@ -207,7 +208,7 @@ public:
             localId += 1;
         }
         assert(localId == vertexCount);
-        // Traverse all the nodes and out-going edges to set up CSR data.
+        // Traverses all nodes and out-going edges to set up CSR data.
         VertexId vertexCursor = 0;
         EdgeId   edgeCursor   = 0;
         for (auto v : subgraph.vertices) {
@@ -314,7 +315,7 @@ private:
         int *incomingEdges = new int[numParts]();
 
         // The pointers are allocated in pinned memory so that they can be
-        // accessed as outboxes[i]
+        // accessed as outboxes[i] in any CUDA contexts.
         CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **> (&outboxes),
                                   sizeof(MessageBox< VertexMessage<MessageValue> >) * numParts,
                                   cudaHostAllocPortable));
