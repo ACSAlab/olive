@@ -18,6 +18,7 @@ public:
 
 static int * level_g;
 
+
 /**
  * Functions for vertex map and filter
  */
@@ -74,8 +75,7 @@ __device__ BfsCondFunc bfs_cond_d     = bfs_cond;
 __device__ BfsPackFunc bfs_pack_d     = bfs_pack;
 __device__ BfsUnpackFunc bfs_unpack_d = bfs_unpack;
 
-
-void aggr_state(VertexId globalIds, BfsVertexValue state) {
+void bfs_gather(VertexId globalIds, BfsVertexValue state) {
     level_g[globalIds] = state.level;
 }
 
@@ -100,7 +100,7 @@ std::vector<int> bfs_distributed(const char *path, PartitionId numParts, VertexI
     engine.vertexMap(init_value_h);
     engine.vertexFilter(source, init_source_h);
     engine.run(bfs_cond_h, bfs_update_h, bfs_pack_h, bfs_unpack_h);
-    engine.aggregate(aggr_state);
+    engine.gather(bfs_gather);
 
     auto dist_levels = std::vector<int>(level_g,
                                         level_g + engine.getVertexCount());

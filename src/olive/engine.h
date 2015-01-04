@@ -19,12 +19,6 @@
 #include "logging.h"
 
 
-#define INF_COST 0x7fffffff
-
-
-/**
- * The scatter kernel operates on each inbox and updates the local values.
- */
 template<typename VertexValue, typename MessageValue>
 __global__
 void scatterKernel(
@@ -123,24 +117,23 @@ void vertexFilterKernel(
     int n,
     VertexId id,
     VertexValue *vertexValues,
-    VertexValue (*f)(VertexValue),
+    VertexValue (*update)(VertexValue),
     int *workset)
 {
     int tid = THREAD_INDEX;
     if (tid >= n) return;
     if (globalIds[tid] == id) {
-        vertexValues[tid] = f(vertexValues[tid]);
+        vertexValues[tid] = update(vertexValues[tid]);
         workset[tid] = 1;
     }
 }
-
 
 template<typename VertexValue, typename MessageValue>
 class Engine {
 public:
     /**
-     * [config description]
-     * @param subgraphs [description]
+     * Initialize the engine by specifying a graph path and the number of 
+     * partitions. (random partition by default)
      */
     void init(const char *path, int numParts) {
         util::enableAllPeerAccess();
@@ -158,16 +151,25 @@ public:
         }
     }
 
+    /** Returns the number of the vertices in the graph. */
+    inline VertexId getVertexCount() const {
+        return vertexCount;
+    }
+
     /**
-     * Map a UDF to the global states to aggregate results.
-     * Mapping the global id from partition local id via `globalIds`.
+     * Applies a user-defined function `f` to the global states to gather
+     * local results.
+     *
+     * @param updateAt Function to update global states. It accept the offset in
+     *                 global buffers as the 1st parameter and the local vertex
+     *                 value as the 2nd parameter.
      */
-    void aggregate(void (*f)(VertexId, VertexValue)) {
+    void gather(void (*updateAt)(VertexId, VertexValue)) {
         double startTime = util::currentTimeMillis();
         for (int i = 0; i < partitions.size(); i++) {
             partitions[i].vertexValues.persist();
             for (VertexId j = 0; j < partitions[i].vertexValues.size(); j++) {
-                f(partitions[i].globalIds[j],
+                updateAt(partitions[i].globalIds[j],
                 partitions[i].vertexValues[j]);
             }
         }
@@ -176,11 +178,12 @@ public:
                   << "ms to aggregate results.";
     }
 
-
-    typedef VertexValue (*VertexFunctor) (VertexValue);
-
     /**
-     * Maps a UDF `update` to each vertex.
+     * Applies a user-defined function `update` to all vertices in the graph.
+     *
+     * @param update  Function to update vertex-wise state. It accepts the 
+     *                original vertex value as parameter and returns a new 
+     *                vertex value.
      */
     void vertexMap(VertexValue (*update) (VertexValue)) {
 
@@ -200,9 +203,19 @@ public:
         }
     }
 
+
     /**
-     * Maps a UDF `update` to the vertex with global `id`.
-     * The filtered out vertex will be added to the workset.
+     * Filters one vertex by specifying a vertex id and applies a user-defined
+     * function `update` to it. The filtered-out vertex will be marked as active
+     * and added to the workset.
+     *
+     * Concerns are that if an algorithm requires filtering a bunch of vertices,
+     * the the kernel is invoked frequently. e.g. in Radii Estimation.
+     * 
+     * @param id      Takes the vertex id to filter as parameter
+     * @param update  Function to update vertex-wise state. It accepts the 
+     *                original vertex value as parameter and returns a new
+     *                vertex value.
      */
     void vertexFilter(VertexId id, VertexValue (*update)(VertexValue)) {
         for (int i = 0; i < partitions.size(); i++) {
@@ -224,7 +237,24 @@ public:
         }
     }
 
-    /** Run the engine until all partition vote to quit */
+    /**
+     * Runs the engine until all vertices are inactive (not show up in workset).
+     *
+     * In each superstep, all the active vertices filter out their destination
+     * vertices satisfying the `cond` and applies a user-defined function
+     * `update` to them. The filtered-out destination vertices will be marked as
+     * active and added to the workset.
+     *
+     * Since the graph is edge-cutted, some of the destination vertices may be
+     * in remote partition, message passing schemes will be used. Two functions
+     * to deal with the message passing are required.
+     * 
+     * @param cond   Takes the vertex value as parameter and returns true/false
+     *                (true means that the vertex will be filtered out)
+     * @param update Update the vertex value
+     * @param pack   Packing a vertex value to a message value. 
+     * @param unpack Unpacking a message value to vertex value.
+     */
     void run(bool (*cond)(VertexValue),
              VertexValue (*update)(VertexValue),
              MessageValue (*pack)(VertexValue),
@@ -466,19 +496,6 @@ public:
         delete[] scatterLaunched;
 
         supersteps += 1;
-    }
-
-    // // Aggregate the local states on each partition to global states
-    // void aggregate() {
-    //     double startTime = util::currentTimeMillis();
-    //     for (auto part : partitions) {
-    //         config.aggregate(part);
-    //     }
-    //     double aggrTime = util::currentTimeMillis() - startTime;
-    //     LOG(INFO) << "Aggregagte" << std::setprecision(3) << aggrTime
-    // }
-    inline VertexId getVertexCount() const {
-        return vertexCount;
     }
 
     ~Engine() {
