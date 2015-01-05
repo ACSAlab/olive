@@ -19,20 +19,23 @@ public:
 static int * level_g;
 
 
-/**
- * Functions for vertex map and filter
- */
-__device__
-BfsVertexValue init_value(BfsVertexValue value) {
-    value.level = INF_COST;
-    return value; 
-}
+// Functor to set up value
+struct init_value : public VertexFunction<BfsVertexValue> {
+    __device__ 
+    BfsVertexValue operator() (BfsVertexValue value) {
+        value.level = INF_COST;
+        return value;
+    }
+};
 
-__device__
-BfsVertexValue init_source(BfsVertexValue value) {
-    value.level = 0;
-    return value;
-}
+struct init_source : public VertexFunction<BfsVertexValue> {
+    __device__ 
+    BfsVertexValue operator() (BfsVertexValue value) {
+        value.level = 0;
+        return value;
+    }
+};
+
 
 /**
  * Functions for edgeFilter
@@ -68,8 +71,8 @@ typedef bool           (*BfsCondFunc)(BfsVertexValue);
 typedef int            (*BfsPackFunc)(BfsVertexValue);
 typedef BfsVertexValue (*BfsUnpackFunc)(int);
 
-__device__ BfsMapFunc init_value_d    = init_value;
-__device__ BfsMapFunc init_source_d   = init_source;
+// __device__ BfsMapFunc init_value_d    = init_value;
+// __device__ BfsMapFunc init_source_d   = init_source;
 __device__ BfsMapFunc bfs_update_d    = bfs_update;
 __device__ BfsCondFunc bfs_cond_d     = bfs_cond;
 __device__ BfsPackFunc bfs_pack_d     = bfs_pack;
@@ -85,20 +88,21 @@ std::vector<int> bfs_distributed(const char *path, PartitionId numParts, VertexI
     // The final result, which will be aggregated.
     level_g = (int *) malloc(sizeof(int) * engine.getVertexCount());
 
-    BfsMapFunc init_value_h, init_source_h, bfs_update_h;
+    BfsMapFunc bfs_update_h;
     BfsCondFunc bfs_cond_h;
     BfsPackFunc bfs_pack_h;
     BfsUnpackFunc bfs_unpack_h;
 
-    CUDA_CHECK(cudaMemcpyFromSymbol(&init_value_h, init_value_d, sizeof(BfsMapFunc)));
-    CUDA_CHECK(cudaMemcpyFromSymbol(&init_source_h, init_source_d, sizeof(BfsMapFunc)));
+    // CUDA_CHECK(cudaMemcpyFromSymbol(&init_value_h, init_value_d, sizeof(BfsMapFunc)));
+    // CUDA_CHECK(cudaMemcpyFromSymbol(&init_source_h, init_source_d, sizeof(BfsMapFunc)));
     CUDA_CHECK(cudaMemcpyFromSymbol(&bfs_update_h, bfs_update_d, sizeof(BfsMapFunc)));
     CUDA_CHECK(cudaMemcpyFromSymbol(&bfs_cond_h, bfs_cond_d, sizeof(BfsCondFunc)));
     CUDA_CHECK(cudaMemcpyFromSymbol(&bfs_pack_h, bfs_pack_d, sizeof(BfsPackFunc)));
     CUDA_CHECK(cudaMemcpyFromSymbol(&bfs_unpack_h, bfs_unpack_d, sizeof(BfsUnpackFunc)));
 
-    engine.vertexMap(init_value_h);
-    engine.vertexFilter(source, init_source_h);
+
+    engine.vertexMap<init_value>(init_value());
+    engine.vertexFilter<init_source>(source, init_source());
     engine.run(bfs_cond_h, bfs_update_h, bfs_pack_h, bfs_unpack_h);
     engine.gather(bfs_gather);
 

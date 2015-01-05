@@ -15,6 +15,7 @@
 #include "common.h"
 #include "flexible.h"
 #include "partition.h"
+#include "functional.h"
 #include "partition_strategy.h"
 #include "logging.h"
 
@@ -97,12 +98,12 @@ void expandKernel(
     }
 }
 
-template<typename VertexValue>
+template<typename VertexFunction, typename VertexValue>
 __global__
 void vertexMapKernel(
     VertexValue *vertexValues,
     int n,
-    VertexValue (*f)(VertexValue))
+    VertexFunction f)
 {
     int tid = THREAD_INDEX;
     if (tid >= n) return;
@@ -110,20 +111,20 @@ void vertexMapKernel(
 }
 
 
-template<typename VertexValue>
+template<typename VertexFunction, typename VertexValue>
 __global__
 void vertexFilterKernel(
     const VertexId *globalIds,
     int n,
     VertexId id,
     VertexValue *vertexValues,
-    VertexValue (*update)(VertexValue),
+    VertexFunction f,
     int *workset)
 {
     int tid = THREAD_INDEX;
     if (tid >= n) return;
     if (globalIds[tid] == id) {
-        vertexValues[tid] = update(vertexValues[tid]);
+        vertexValues[tid] = f(vertexValues[tid]);
         workset[tid] = 1;
     }
 }
@@ -181,11 +182,12 @@ public:
     /**
      * Applies a user-defined function `update` to all vertices in the graph.
      *
-     * @param update  Function to update vertex-wise state. It accepts the 
-     *                original vertex value as parameter and returns a new 
-     *                vertex value.
+     * @param f  Function to update vertex-wise state. It accepts the 
+     *           original vertex value as parameter and returns a new 
+     *           vertex value.
      */
-    void vertexMap(VertexValue (*update) (VertexValue)) {
+    template<typename VertexFunction>
+    void vertexMap(VertexFunction f) {
 
         for (int i = 0; i < partitions.size(); i++) {
 
@@ -195,10 +197,10 @@ public:
 
             CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
             auto config = util::kernelConfig(partitions[i].vertexValues.size());
-            vertexMapKernel <VertexValue> <<< config.first, config.second>>>(
+            vertexMapKernel <VertexFunction, VertexValue> <<< config.first, config.second>>>(
                 partitions[i].vertexValues.elemsDevice,
                 partitions[i].vertexValues.size(),
-                update);
+                f);
             CUDA_CHECK(cudaThreadSynchronize());
         }
     }
@@ -213,11 +215,12 @@ public:
      * the the kernel is invoked frequently. e.g. in Radii Estimation.
      * 
      * @param id      Takes the vertex id to filter as parameter
-     * @param update  Function to update vertex-wise state. It accepts the 
+     * @param f       Function to update vertex-wise state. It accepts the 
      *                original vertex value as parameter and returns a new
      *                vertex value.
      */
-    void vertexFilter(VertexId id, VertexValue (*update)(VertexValue)) {
+    template<typename VertexFunction>
+    void vertexFilter(VertexId id, VertexFunction f) {
         for (int i = 0; i < partitions.size(); i++) {
 
             LOG(DEBUG) << "Partition" << partitions[i].partitionId
@@ -226,12 +229,12 @@ public:
 
             CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
             auto config = util::kernelConfig(partitions[i].vertexValues.size());
-            vertexFilterKernel <VertexValue> <<< config.first, config.second>>>(
+            vertexFilterKernel <VertexFunction, VertexValue> <<< config.first, config.second>>>(
                 partitions[i].globalIds.elemsDevice,
                 partitions[i].vertexValues.size(),
                 id,
                 partitions[i].vertexValues.elemsDevice,
-                update,
+                f,
                 partitions[i].workset.elemsDevice);
             CUDA_CHECK(cudaThreadSynchronize());
         }
