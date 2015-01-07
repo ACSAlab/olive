@@ -18,69 +18,59 @@ public:
 
 static int * level_g;
 
+/**
+ * Functor to set up value
+ */
+struct bfs_init_value {
+    int _level;
 
-// Functor to set up value
-struct init_value : public VertexFunction<BfsVertexValue> {
-    __device__ 
+    bfs_init_value(int l): _level(l) {}
+
+    __device__
     BfsVertexValue operator() (BfsVertexValue value) {
-        value.level = INF_COST;
+        value.level = _level;
         return value;
     }
 };
-
-struct init_source : public VertexFunction<BfsVertexValue> {
-    __device__ 
-    BfsVertexValue operator() (BfsVertexValue value) {
-        value.level = 0;
-        return value;
-    }
-};
-
 
 /**
- * Functions for edgeFilter
+ * Function for edge filter
  */
-__device__
-bool bfs_cond(BfsVertexValue value) {
-    return (value.level == INF_COST);
-}
+struct bfs_edge_context {
+    __device__
+    bool cond(BfsVertexValue value) {
+        return (value.level == INF_COST);
+    }
 
-__device__
-BfsVertexValue bfs_update(BfsVertexValue value) {
-    value.level += 1;
-    return value;
-}
+    __device__
+    BfsVertexValue update(BfsVertexValue value) {
+        value.level += 1;
+        return value;
+    }
+};
 
 /**
  * Functions for message packing/unpacking
  */
-__device__
-int bfs_pack(BfsVertexValue value) {
-    return value.level;
-}
+struct bfs_message_context {
+    __device__
+    int pack(BfsVertexValue value) {
+        return value.level;
+    }
 
-__device__
-BfsVertexValue bfs_unpack(int level) {
-    BfsVertexValue value;
-    value.level = level;
-    return value;
-}
+    __device__
+    BfsVertexValue unpack(int level) {
+        BfsVertexValue value;
+        value.level = level;
+        return value;
+    }
+};
 
-typedef BfsVertexValue (*BfsMapFunc)(BfsVertexValue);
-typedef bool           (*BfsCondFunc)(BfsVertexValue);
-typedef int            (*BfsPackFunc)(BfsVertexValue);
-typedef BfsVertexValue (*BfsUnpackFunc)(int);
-
-// __device__ BfsMapFunc init_value_d    = init_value;
-// __device__ BfsMapFunc init_source_d   = init_source;
-__device__ BfsMapFunc bfs_update_d    = bfs_update;
-__device__ BfsCondFunc bfs_cond_d     = bfs_cond;
-__device__ BfsPackFunc bfs_pack_d     = bfs_pack;
-__device__ BfsUnpackFunc bfs_unpack_d = bfs_unpack;
 
 void bfs_gather(VertexId globalIds, BfsVertexValue state) {
     level_g[globalIds] = state.level;
 }
+
 
 std::vector<int> bfs_distributed(const char *path, PartitionId numParts, VertexId source) {
     Engine<BfsVertexValue, int> engine;
@@ -88,22 +78,19 @@ std::vector<int> bfs_distributed(const char *path, PartitionId numParts, VertexI
     // The final result, which will be aggregated.
     level_g = (int *) malloc(sizeof(int) * engine.getVertexCount());
 
-    BfsMapFunc bfs_update_h;
-    BfsCondFunc bfs_cond_h;
-    BfsPackFunc bfs_pack_h;
-    BfsUnpackFunc bfs_unpack_h;
+    // Initialize all vertices
+    engine.vertexMap<bfs_init_value>(bfs_init_value(INF_COST));
 
-    // CUDA_CHECK(cudaMemcpyFromSymbol(&init_value_h, init_value_d, sizeof(BfsMapFunc)));
-    // CUDA_CHECK(cudaMemcpyFromSymbol(&init_source_h, init_source_d, sizeof(BfsMapFunc)));
-    CUDA_CHECK(cudaMemcpyFromSymbol(&bfs_update_h, bfs_update_d, sizeof(BfsMapFunc)));
-    CUDA_CHECK(cudaMemcpyFromSymbol(&bfs_cond_h, bfs_cond_d, sizeof(BfsCondFunc)));
-    CUDA_CHECK(cudaMemcpyFromSymbol(&bfs_pack_h, bfs_pack_d, sizeof(BfsPackFunc)));
-    CUDA_CHECK(cudaMemcpyFromSymbol(&bfs_unpack_h, bfs_unpack_d, sizeof(BfsUnpackFunc)));
+    // Filter the source vertex
+    engine.vertexFilter<bfs_init_value>(source, bfs_init_value(0));
 
 
-    engine.vertexMap<init_value>(init_value());
-    engine.vertexFilter<init_source>(source, init_source());
-    engine.run(bfs_cond_h, bfs_update_h, bfs_pack_h, bfs_unpack_h);
+    int suptersteps = 0;
+    while (!engine.isTerminated()) {
+        LOG(INFO) << "Superstep: " << suptersteps++;
+        engine.edgeFilter<bfs_edge_context, bfs_message_context>(bfs_edge_context(), bfs_message_context());
+    }
+
     engine.gather(bfs_gather);
 
     auto dist_levels = std::vector<int>(level_g,

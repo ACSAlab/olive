@@ -15,125 +15,16 @@
 #include "common.h"
 #include "flexible.h"
 #include "partition.h"
-#include "functional.h"
 #include "partition_strategy.h"
 #include "logging.h"
+#include "engine_kernel.h"
 
-
-template<typename VertexValue, typename MessageValue>
-__global__
-void scatterKernel(
-    MessageBox< VertexMessage<MessageValue> > *inbox,
-    VertexValue *vertexValues,
-    int *workset,
-    bool (*cond)(VertexValue),
-    VertexValue (*update)(VertexValue),
-    VertexValue (*unpack)(MessageValue))
-{
-    int tid = THREAD_INDEX;
-    if (tid >= inbox->length) return;
-
-    VertexId inNode = inbox->buffer[tid].receiverId;
-    VertexValue newValue = unpack(inbox->buffer[tid].value);
-
-    if (cond(vertexValues[inNode])) {
-        vertexValues[inNode] = update(newValue);
-        workset[inNode] = 1;
-    }
-}
-
-__global__
-void compactKernel(
-    int *workset,
-    size_t n,
-    VertexId *workqueue,
-    size_t *workqueueSize)
-{
-    int tid = THREAD_INDEX;
-    if (tid >= n) return;
-    if (workset[tid] == 1) {
-        workset[tid] = 0;
-        size_t offset = atomicAdd(reinterpret_cast<unsigned long long *> (workqueueSize), 1);
-        workqueue[offset] = tid;
-    }
-}
-
-template<typename VertexValue, typename MessageValue>
-__global__
-void expandKernel(
-    PartitionId thisPid,
-    const EdgeId *vertices,
-    const Vertex *edges,
-    MessageBox< VertexMessage<MessageValue> > *outboxes,
-    int *workset,
-    VertexId *workqueue,
-    int n,
-    VertexValue *vertexValues,
-    bool (*cond)(VertexValue),
-    VertexValue (*update)(VertexValue),
-    MessageValue (*pack)(VertexValue))
-{
-    int tid = THREAD_INDEX;
-    if (tid >= n) return;
-    VertexId outNode = workqueue[tid];
-    EdgeId first = vertices[outNode];
-    EdgeId last = vertices[outNode + 1];
-
-    for (EdgeId edge = first; edge < last; edge ++) {
-        PartitionId pid = edges[edge].partitionId;
-        if (pid == thisPid) {  // In this partition
-            VertexId inNode = edges[edge].localId;
-            if (cond(vertexValues[inNode])) {
-                vertexValues[inNode] = update(vertexValues[outNode]);
-                workset[inNode] = 1;
-            }
-        } else {  // In remote partition
-            VertexMessage<MessageValue> msg;
-            msg.receiverId = edges[edge].localId;
-            msg.value = pack(vertexValues[outNode]);
-
-            size_t offset = atomicAdd(reinterpret_cast<unsigned long long *> (&outboxes[pid].length), 1);
-            outboxes[pid].buffer[offset] = msg;
-        }
-    }
-}
-
-template<typename VertexFunction, typename VertexValue>
-__global__
-void vertexMapKernel(
-    VertexValue *vertexValues,
-    int n,
-    VertexFunction f)
-{
-    int tid = THREAD_INDEX;
-    if (tid >= n) return;
-    vertexValues[tid] = f(vertexValues[tid]);
-}
-
-
-template<typename VertexFunction, typename VertexValue>
-__global__
-void vertexFilterKernel(
-    const VertexId *globalIds,
-    int n,
-    VertexId id,
-    VertexValue *vertexValues,
-    VertexFunction f,
-    int *workset)
-{
-    int tid = THREAD_INDEX;
-    if (tid >= n) return;
-    if (globalIds[tid] == id) {
-        vertexValues[tid] = f(vertexValues[tid]);
-        workset[tid] = 1;
-    }
-}
 
 template<typename VertexValue, typename MessageValue>
 class Engine {
 public:
     /**
-     * Initialize the engine by specifying a graph path and the number of 
+     * Initialize the engine by specifying a graph path and the number of
      * partitions. (random partition by default)
      */
     void init(const char *path, int numParts) {
@@ -157,6 +48,11 @@ public:
         return vertexCount;
     }
 
+    /** Returns the termination state of the engine. */
+    inline bool isTerminated() const {
+        return terminate;
+    }
+
     /**
      * Applies a user-defined function `f` to the global states to gather
      * local results.
@@ -171,7 +67,7 @@ public:
             partitions[i].vertexValues.persist();
             for (VertexId j = 0; j < partitions[i].vertexValues.size(); j++) {
                 updateAt(partitions[i].globalIds[j],
-                partitions[i].vertexValues[j]);
+                         partitions[i].vertexValues[j]);
             }
         }
         LOG(INFO) << "It took " << std::setprecision(3)
@@ -182,8 +78,8 @@ public:
     /**
      * Applies a user-defined function `update` to all vertices in the graph.
      *
-     * @param f  Function to update vertex-wise state. It accepts the 
-     *           original vertex value as parameter and returns a new 
+     * @param f  Function to update vertex-wise state. It accepts the
+     *           original vertex value as parameter and returns a new
      *           vertex value.
      */
     template<typename VertexFunction>
@@ -213,9 +109,9 @@ public:
      *
      * Concerns are that if an algorithm requires filtering a bunch of vertices,
      * the the kernel is invoked frequently. e.g. in Radii Estimation.
-     * 
+     *
      * @param id      Takes the vertex id to filter as parameter
-     * @param f       Function to update vertex-wise state. It accepts the 
+     * @param f       Function to update vertex-wise state. It accepts the
      *                original vertex value as parameter and returns a new
      *                vertex value.
      */
@@ -241,44 +137,26 @@ public:
     }
 
     /**
-     * Runs the engine until all vertices are inactive (not show up in workset).
-     *
-     * In each superstep, all the active vertices filter out their destination
-     * vertices satisfying the `cond` and applies a user-defined function
+     * In each superstep, all active vertices (1) filter out their destination
+     * vertices satisfying the `cond` and (2) apply a user-defined function
      * `update` to them. The filtered-out destination vertices will be marked as
      * active and added to the workset.
      *
      * Since the graph is edge-cutted, some of the destination vertices may be
      * in remote partition, message passing schemes will be used. Two functions
      * to deal with the message passing are required.
-     * 
+     *
      * @param cond   Takes the vertex value as parameter and returns true/false
      *                (true means that the vertex will be filtered out)
      * @param update Update the vertex value
-     * @param pack   Packing a vertex value to a message value. 
+     * @param pack   Packing a vertex value to a message value.
      * @param unpack Unpacking a message value to vertex value.
      */
-    void run(bool (*cond)(VertexValue),
-             VertexValue (*update)(VertexValue),
-             MessageValue (*pack)(VertexValue),
-             VertexValue (*unpack)(MessageValue))
+    template<typename EdgeContext, typename MessageContext>
+    void edgeFilter(EdgeContext edgeContext, MessageContext msgContext)
     {
-        supersteps = 0;
-        while (true) {
-            terminate = true;
-            superstep(cond, update, pack, unpack);
 
-            if (terminate) break;
-        }
-    }
-
-    void superstep(bool (*cond)(VertexValue),
-             VertexValue (*update)(VertexValue),
-             MessageValue (*pack)(VertexValue),
-             VertexValue (*unpack)(MessageValue)) 
-    {
-        LOG(DEBUG) << "************************************ Superstep " << supersteps
-                   << " ************************************";
+        terminate = true;
 
         // To mask off the cudaEventElapsed API.
         bool *expandLaunched = new bool[partitions.size()];
@@ -320,14 +198,13 @@ public:
                 CUDA_CHECK(cudaEventRecord(partitions[i].startEvents[0],
                                            partitions[i].streams[1]));
                 auto config = util::kernelConfig(partitions[i].inboxes[j].length);
-                scatterKernel<VertexValue, MessageValue> <<< config.first, config.second, 0,
-                              partitions[i].streams[1] >>> (
-                                  &partitions[i].inboxes[j],
-                                  partitions[i].vertexValues.elemsDevice,
-                                  partitions[i].workset.elemsDevice,
-                                  cond,
-                                  update,
-                                  unpack);
+                scatterKernel<VertexValue, MessageValue, EdgeContext, MessageContext>
+                <<< config.first, config.second, 0, partitions[i].streams[1] >>> (
+                    partitions[i].inboxes[j],
+                    partitions[i].vertexValues.elemsDevice,
+                    partitions[i].workset.elemsDevice,
+                    edgeContext,
+                    msgContext);
                 CUDA_CHECK(cudaEventRecord(partitions[i].endEvents[0],
                                            partitions[i].streams[1]));
             }
@@ -349,8 +226,7 @@ public:
             CUDA_CHECK(cudaEventRecord(partitions[i].startEvents[1],
                                        partitions[i].streams[1]));
             auto config = util::kernelConfig(partitions[i].vertexCount);
-            compactKernel <<< config.first, config.second, 0,
-                          partitions[i].streams[1]>>>(
+            compactKernel <<< config.first, config.second, 0, partitions[i].streams[1]>>> (
                               partitions[i].workset.elemsDevice,
                               partitions[i].vertexCount,
                               partitions[i].workqueue.elemsDevice,
@@ -398,19 +274,18 @@ public:
             CUDA_CHECK(cudaEventRecord(partitions[i].startEvents[2],
                                        partitions[i].streams[1]));
             auto config = util::kernelConfig(*partitions[i].workqueueSize);
-            expandKernel<VertexValue, MessageValue> <<< config.first, config.second, 0,
-                         partitions[i].streams[1]>>>(
-                             partitions[i].partitionId,
-                             partitions[i].vertices.elemsDevice,
-                             partitions[i].edges.elemsDevice,
-                             partitions[i].outboxes,
-                             partitions[i].workset.elemsDevice,
-                             partitions[i].workqueue.elemsDevice,
-                             *partitions[i].workqueueSize,
-                             partitions[i].vertexValues.elemsDevice,
-                             cond,
-                             update,
-                             pack);
+            expandKernel<VertexValue, MessageValue, EdgeContext, MessageContext>
+            <<< config.first, config.second, 0, partitions[i].streams[1]>>>(
+                partitions[i].partitionId,
+                partitions[i].vertices.elemsDevice,
+                partitions[i].edges.elemsDevice,
+                partitions[i].outboxes,
+                partitions[i].workset.elemsDevice,
+                partitions[i].workqueue.elemsDevice,
+                *partitions[i].workqueueSize,
+                partitions[i].vertexValues.elemsDevice,
+                edgeContext,
+                msgContext);
             CUDA_CHECK(cudaEventRecord(partitions[i].endEvents[2],
                                        partitions[i].streams[1]));
 
@@ -485,8 +360,7 @@ public:
             if (compTime > maxCompTime) maxCompTime = compTime;
         }
         double commTime = totalTime - maxCompTime;
-        LOG(INFO) << "Superstep" << supersteps
-                  << ": total=" << std::setprecision(3) << totalTime << "ms"
+        LOG(INFO) << "total=" << std::setprecision(3) << totalTime << "ms"
                   << ", comp=" << std::setprecision(2) << maxCompTime / totalTime
                   << ", comm=" << std::setprecision(2) << commTime / totalTime;
 
@@ -498,7 +372,7 @@ public:
         delete[] compactLaunched;
         delete[] scatterLaunched;
 
-        supersteps += 1;
+        // supersteps += 1;
     }
 
     ~Engine() {
@@ -511,7 +385,7 @@ public:
 
 
 private:
-    int         supersteps;
+    // int         supersteps;
     bool        terminate;
     VertexId    vertexCount;
     std::vector< Partition<VertexValue, MessageValue> > partitions;
