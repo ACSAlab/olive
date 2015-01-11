@@ -38,7 +38,7 @@ struct bfs_init_value {
  */
 struct bfs_edge_context {
     __device__
-    bool cond(BfsVertexValue value) {
+    bool pred(BfsVertexValue value) {
         return (value.level == INF_COST);
     }
 

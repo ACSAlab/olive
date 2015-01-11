@@ -137,20 +137,16 @@ public:
     }
 
     /**
-     * In each superstep, all active vertices (1) filter out their destination
-     * vertices satisfying the `cond` and (2) apply a user-defined function
-     * `update` to them. The filtered-out destination vertices will be marked as
-     * active and added to the workset.
+     * In each superstep, execute the `edgeContext` for the out-going edges of 
+     * all active vertices. More specifically, (1) the vertices for which 
+     * `edgeContex.pred` returns the boolean value true will be filtered out
+     * (2) a user-defined function `edgeContex.update` will be applied to them.
+     * The filtered-out destination vertices will be marked as active and
+     * added to the workset.
      *
      * Since the graph is edge-cutted, some of the destination vertices may be
-     * in remote partition, message passing schemes will be used. Two functions
-     * to deal with the message passing are required.
+     * in remote partition, message passing schemes will be used.
      *
-     * @param cond   Takes the vertex value as parameter and returns true/false
-     *                (true means that the vertex will be filtered out)
-     * @param update Update the vertex value
-     * @param pack   Packing a vertex value to a message value.
-     * @param unpack Unpacking a message value to vertex value.
      */
     template<typename EdgeContext, typename MessageContext>
     void edgeFilter(EdgeContext edgeContext, MessageContext msgContext)

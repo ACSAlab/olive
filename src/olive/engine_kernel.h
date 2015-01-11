@@ -52,7 +52,7 @@ void expandKernel(
         PartitionId pid = edges[edge].partitionId;
         if (pid == thisPid) {  // In this partition
             VertexId inNode = edges[edge].localId;
-            if (edgeContext.cond(vertexValues[inNode])) {
+            if (edgeContext.pred(vertexValues[inNode])) {
                 vertexValues[inNode] = edgeContext.update(vertexValues[outNode]);
                 workset[inNode] = 1;
             }
@@ -97,7 +97,7 @@ void scatterKernel(
     VertexId inNode = inbox.buffer[tid].receiverId;
     VertexValue newValue = msgContext.unpack(inbox.buffer[tid].value);
 
-    if (edgeContext.cond(vertexValues[inNode])) {
+    if (edgeContext.pred(vertexValues[inNode])) {
         vertexValues[inNode] = edgeContext.update(newValue);
         workset[inNode] = 1;
     }
