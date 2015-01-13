@@ -49,23 +49,6 @@ struct bfs_edge_context {
     }
 };
 
-/**
- * Functions for message packing/unpacking
- */
-struct bfs_message_context {
-    __device__
-    int pack(BfsVertexValue value) {
-        return value.level;
-    }
-
-    __device__
-    BfsVertexValue unpack(int level) {
-        BfsVertexValue value;
-        value.level = level;
-        return value;
-    }
-};
-
 
 void bfs_gather(VertexId globalIds, BfsVertexValue state) {
     level_g[globalIds] = state.level;
@@ -73,7 +56,7 @@ void bfs_gather(VertexId globalIds, BfsVertexValue state) {
 
 
 std::vector<int> bfs_distributed(const char *path, PartitionId numParts, VertexId source) {
-    Engine<BfsVertexValue, int> engine;
+    Engine<BfsVertexValue> engine;
     engine.init(path, numParts);
     // The final result, which will be aggregated.
     level_g = (int *) malloc(sizeof(int) * engine.getVertexCount());
@@ -84,17 +67,15 @@ std::vector<int> bfs_distributed(const char *path, PartitionId numParts, VertexI
     // Filter the source vertex
     engine.vertexFilter<bfs_init_value>(source, bfs_init_value(0));
 
-
-    int suptersteps = 0;
+    int bfs_levels = 0;
     while (!engine.isTerminated()) {
-        LOG(INFO) << "Superstep: " << suptersteps++;
-        engine.edgeFilter<bfs_edge_context, bfs_message_context>(bfs_edge_context(), bfs_message_context());
+        printf("\n====================== BFS level: %d ======================\n", bfs_levels++);
+        engine.edgeFilter<bfs_edge_context>(bfs_edge_context());
     }
 
     engine.gather(bfs_gather);
 
-    auto dist_levels = std::vector<int>(level_g,
-                                        level_g + engine.getVertexCount());
+    auto dist_levels = std::vector<int>(level_g, level_g + engine.getVertexCount());
 
     for (int i = 0; i < dist_levels.size(); i++) {
         printf("%d ",dist_levels[i]);

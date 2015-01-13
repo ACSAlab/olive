@@ -20,7 +20,7 @@
 #include "engine_kernel.h"
 
 
-template<typename VertexValue, typename MessageValue>
+template<typename VertexValue>
 class Engine {
 public:
     /**
@@ -41,6 +41,8 @@ public:
         for (int i = 0; i < subgraphs.size(); i++) {
             partitions[i].fromSubgraph(subgraphs[i]);
         }
+
+        terminate = true;
     }
 
     /** Returns the number of the vertices in the graph. */
@@ -101,7 +103,6 @@ public:
         }
     }
 
-
     /**
      * Filters one vertex by specifying a vertex id and applies a user-defined
      * function `update` to it. The filtered-out vertex will be marked as active
@@ -134,7 +135,11 @@ public:
                 partitions[i].workset.elemsDevice);
             CUDA_CHECK(cudaThreadSynchronize());
         }
+
+        terminate = false;
     }
+
+
 
     /**
      * In each superstep, execute the `edgeContext` for the out-going edges of 
@@ -145,11 +150,12 @@ public:
      * added to the workset.
      *
      * Since the graph is edge-cutted, some of the destination vertices may be
-     * in remote partition, message passing schemes will be used.
+     * in remote partition, message passing schemes will be used. The whole
+     * vertex state will be sent as messages.
      *
      */
-    template<typename EdgeContext, typename MessageContext>
-    void edgeFilter(EdgeContext edgeContext, MessageContext msgContext)
+    template<typename EdgeContext>
+    void edgeFilter(EdgeContext edgeContext)
     {
 
         terminate = true;
@@ -194,13 +200,12 @@ public:
                 CUDA_CHECK(cudaEventRecord(partitions[i].startEvents[0],
                                            partitions[i].streams[1]));
                 auto config = util::kernelConfig(partitions[i].inboxes[j].length);
-                scatterKernel<VertexValue, MessageValue, EdgeContext, MessageContext>
+                edgeScatterKernel<VertexValue, EdgeContext>
                 <<< config.first, config.second, 0, partitions[i].streams[1] >>> (
                     partitions[i].inboxes[j],
                     partitions[i].vertexValues.elemsDevice,
                     partitions[i].workset.elemsDevice,
-                    edgeContext,
-                    msgContext);
+                    edgeContext);
                 CUDA_CHECK(cudaEventRecord(partitions[i].endEvents[0],
                                            partitions[i].streams[1]));
             }
@@ -222,7 +227,7 @@ public:
             CUDA_CHECK(cudaEventRecord(partitions[i].startEvents[1],
                                        partitions[i].streams[1]));
             auto config = util::kernelConfig(partitions[i].vertexCount);
-            compactKernel <<< config.first, config.second, 0, partitions[i].streams[1]>>> (
+            edgeCompactKernel <<< config.first, config.second, 0, partitions[i].streams[1]>>> (
                               partitions[i].workset.elemsDevice,
                               partitions[i].vertexCount,
                               partitions[i].workqueue.elemsDevice,
@@ -270,7 +275,7 @@ public:
             CUDA_CHECK(cudaEventRecord(partitions[i].startEvents[2],
                                        partitions[i].streams[1]));
             auto config = util::kernelConfig(*partitions[i].workqueueSize);
-            expandKernel<VertexValue, MessageValue, EdgeContext, MessageContext>
+            edgeExpandKernel<VertexValue, EdgeContext>
             <<< config.first, config.second, 0, partitions[i].streams[1]>>>(
                 partitions[i].partitionId,
                 partitions[i].vertices.elemsDevice,
@@ -280,8 +285,7 @@ public:
                 partitions[i].workqueue.elemsDevice,
                 *partitions[i].workqueueSize,
                 partitions[i].vertexValues.elemsDevice,
-                edgeContext,
-                msgContext);
+                edgeContext);
             CUDA_CHECK(cudaEventRecord(partitions[i].endEvents[2],
                                        partitions[i].streams[1]));
 
@@ -381,11 +385,13 @@ public:
 
 
 private:
-    // int         supersteps;
     bool        terminate;
     VertexId    vertexCount;
-    std::vector< Partition<VertexValue, MessageValue> > partitions;
-    // For profiling
+
+    /** For each partition the whole state of vertex will be treated as message */
+    std::vector< Partition<VertexValue, VertexValue> > partitions;
+
+    /** For profiling */
     double      supterstepCompTime;
     double      supterstepCommTime;
     double      supterstepTime;

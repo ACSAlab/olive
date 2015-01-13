@@ -25,82 +25,77 @@
 namespace flex {
 /**
  * Directed edge structure for flexible graph representation.
- * Each edge contains an `id` standing for either its destination or its source,
- * and its associated attribute. For an outgoing edge, `id` is the destination.
- * While for an incoming edge, `id` is the source.
- *
- *
- * @tparam ED the edge attribute type
+ * Each edge contains an vertex id for either its destination or its source,
+ * and its associated edge value.
+ * 
+ * @tparam EdgeValue the edge value type
  */
-template<typename ED>
+template<typename EdgeValue>
 class Edge {
 public:
-    VertexId id;
-    ED       attr;
+    VertexId vertexId;
+    EdgeValue value;
 
     /** Constructor */
-    explicit Edge(VertexId id_, ED d): id(id_), attr(d) {}
+    explicit Edge(VertexId id, EdgeValue v): vertexId(id), value(v) {}
 
     /** For sorting the outgoing edges of a certain vertex */
     friend bool operator< (Edge a, Edge b) {
-        return a.id < b.id;
+        return a.vertexId < b.vertexId;
     }
 };
 
 /**
  * Vertex entry for flexible graph representation. Each vertex contains an `id`,
- * all its outgoing edges, all its ingoing edges, and an arbitrary attribute.
+ * all its outgoing edges, all its ingoing edges, and an arbitrary value.
  * A remote (ghost) vertex in a subgraph has not this entry.
  *
  * @note Storing the outgoing edges for each vertex is sufficient to represent
  * the graph. `inEdges` is just for analyzing the topology of the graph.
  *
- * @tparam VD the vertex attribute type
- * @tparam ED the edge attribute type
+ * @tparam VertexValue the vertex value type
+ * @tparam EdgeValue the edge value type
  */
-template<typename VD, typename ED>
+template<typename VertexValue, typename EdgeValue>
 class Vertex {
 public:
     /**
      * Storing only outEdges is sufficient to express the topology of a graph.
-     * However, keeping this information is useful when allocating the message
-     * buffers before-hand on GPUs.
+     * But keeping inEdges is useful when allocating the message buffers
+     * before-hand on GPUs.
      */
-    std::vector< Edge<ED> > outEdges;
-    std::vector< Edge<ED> > inEdges;
+    std::vector< Edge<EdgeValue> > outEdges;
+    std::vector< Edge<EdgeValue> > inEdges;
 
     /** The unique (global) id for vertex. */
     VertexId    id;
 
-    /** Vertex-wise attribute. */
-    VD          attr;
+    /** Vertex-wise value. */
+    VertexValue value;
 
     /** Constructor */
-    explicit Vertex(VertexId id_, VD d) {
-        id = id_;
-        attr = d;
-    }
+    explicit Vertex(VertexId id_, VertexValue v) : id(id_), value(v) {}
 
     /** Reachability to anther vertex */
-    bool isReachableTo(VertexId other) const {
-        for (auto e : outEdges) {
-            if (other == e.id) return true;
-        }
-        return false;
-    }
+    // bool isReachableTo(VertexId other) const {
+    //     for (auto e : outEdges) {
+    //         if (other == e.id) return true;
+    //     }
+    //     return false;
+    // }
 
     /** Returns the out-degree of this node. */
-    size_t outdegree() const {
+    inline size_t outdegree() const {
         return outEdges.size();
     }
 
     /** Shuffles the outgoing edges. */
-    void shuffleEdges() {
+    inline void shuffleEdges() {
         std::random_shuffle(outEdges.begin(), outEdges.end());
     }
 
     /** Sorts the outgoing edges according to their destination. */
-    void sortEdgesById() {
+    inline void sortEdgesById() {
         std::stable_sort(outEdges.begin(), outEdges.end());
     }
 
@@ -112,21 +107,20 @@ public:
 
 /**
  * Flexible graph representation for in-memory querying or manipulating.
- *
- * @tparam VD the vertex attribute type
- * @tparam ED the edge attribute type
  */
-template <typename VD, typename ED>
+template <typename VertexValue, typename EdgeValue>
 class Graph {
 public:
     /** All existing vertices in a graph. */
-    std::vector< Vertex<VD, ED> > vertices;
+    std::vector< Vertex<VertexValue, EdgeValue> > vertices;
 
     /**
      * Some vertices are missing from a partitioned subgraph. Records the
-     * `partitionId` and the local id for those missing vertices.
+     * partition id and the local id for those missing vertices.
+     * 
      * The ghost vertices are stored as key-value pairs, where the key is the
      * global id and the value is a (partitionId, localId) pair.
+     * 
      * It can be used to establish a routing table which ships a ghost vertex
      * to its remote partition.
      *
@@ -150,7 +144,7 @@ public:
     /**
      * Returns the total vertex number in the graph.
      */
-    size_t nodes() const {
+    inline size_t nodes() const {
         return vertices.size();
     }
 
@@ -187,14 +181,13 @@ public:
     /**
      * Turning edge tuple representation to flex's edge representation.
      *
-     * @note When a graph is built with this method, the vertex-wise attribute
+     * @note When a graph is built with this method, the vertex value
      * is ignored (simply set as 0).
      *
-     * @param edgeTuple An edge tuple formed as (srcId, dstId , attr)
      */
-    void addEdgeTuple(EdgeTuple<ED> edgeTuple) {
-        Edge<ED> outEdge(edgeTuple.dstId, edgeTuple.attr);
-        Edge<ED> inEdge(edgeTuple.srcId, edgeTuple.attr);
+    void addEdgeTuple(EdgeTuple<EdgeValue> edgeTuple) {
+        Edge<EdgeValue> outEdge(edgeTuple.dstId, edgeTuple.value);
+        Edge<EdgeValue> inEdge(edgeTuple.srcId, edgeTuple.value);
         bool srcExists = false;
         bool dstExists = false;
         // If the target node already exists, append the edge directly.
@@ -210,12 +203,12 @@ public:
             }
         }
         if (!srcExists) {
-            Vertex<int, ED> newNode(edgeTuple.srcId, 0);
+            Vertex<int, EdgeValue> newNode(edgeTuple.srcId, 0);
             newNode.outEdges.push_back(outEdge);
             vertices.push_back(newNode);
         }
         if (!dstExists) {
-            Vertex<int, ED> newNode(edgeTuple.dstId, 0);
+            Vertex<int, EdgeValue> newNode(edgeTuple.dstId, 0);
             newNode.inEdges.push_back(inEdge);
             vertices.push_back(newNode);
         }
@@ -265,7 +258,7 @@ public:
      * integers: a source id and a target id. Skips lines that begin with `#`.
      *
      * @note If a graph is loaded from  a edge list file, the type of edge or
-     * vertex associated attribute is `int`. Meanwhile, the vertex-associated
+     * vertex associated value is `int`. Meanwhile, the vertex-associated
      * data is given a meaningless value (0 by default).
      *
      * @example Loads a file in the following format:
@@ -291,6 +284,7 @@ public:
         char *token;                    // Points to the parsed token
         char *remaining;                // Points to the remaining line
         double startTime = util::currentTimeMillis();
+
         while (fgets(line, 1024, fileHandler) != NULL) {
             if (line[0] != '\0' && line[0] != '#') {
                 std::vector<char *> tokens;
@@ -300,8 +294,8 @@ public:
                 while ((token = strsep(&remaining, " \t")) != NULL) {
                     tokens.push_back(token);
                 }
-                if (tokens.size() < 2 || !util::isNumeric(tokens[0]) ||
-                        !util::isNumeric(tokens[1])) {
+                if (tokens.size() < 2 || !util::isNumeric(tokens[0]) || 
+                    !util::isNumeric(tokens[1])) {
                     LOG(WARNING) << "Invalid line: " << line;
                     continue;
                 }
@@ -314,7 +308,7 @@ public:
                 }
             }
         }
-        LOG(INFO) << "It took me " << util::currentTimeMillis() - startTime
+        LOG(INFO) << "It took " << util::currentTimeMillis() - startTime
                   << "ms to load the edge list.";
     }
 
@@ -330,16 +324,18 @@ public:
      * @param numParts          Number of partitions
      * @return                  A vector of subgraphs
      */
-    std::vector< Graph<VD, ED> > partitionBy(
+    std::vector< Graph<VertexValue, EdgeValue> > partitionBy(
         const PartitionStrategy &strategy,
-        PartitionId numParts) {
+        PartitionId numParts)
+    {
         assert(numParts != 0);
-
         double startTime = util::currentTimeMillis();
+
         // Sort before partition since we want to map local id to global
         sortVerticesById();
         sortEdgesById();
-        auto subgraphs = std::vector<Graph<VD, ED>>(numParts);
+
+        auto subgraphs = std::vector< Graph<VertexValue, EdgeValue> >(numParts);
         for (PartitionId i = 0; i < numParts; i++) {
             subgraphs[i].partitionId = i;
             subgraphs[i].numParts = numParts;
@@ -354,7 +350,7 @@ public:
                 subgraphs[i].ghostVertices[v.id] = ghost;
             }
         }
-        LOG(INFO) << "It took me " << util::currentTimeMillis() - startTime
+        LOG(INFO) << "It took " << util::currentTimeMillis() - startTime
                   << "ms to partition the graph.";
         return subgraphs;
     }
@@ -362,14 +358,14 @@ public:
     /**
      * Print the graph on the screen as the outgoing edges.
      */
-    void printOutEdges(bool withAttr = false) const {
+    void printOutEdges(bool withValue = false) const {
         for (auto v : vertices) {
             std::cout << "[" << v.id;
-            if (withAttr) std::cout << ", " + v.attr;
+            if (withValue) std::cout << ", " + v.value;
             std::cout << "] ";
             for (auto e : v.outEdges) {
-                std::cout << " ->" << e.id;
-                if (withAttr) std::cout << ", " << e.attr;
+                std::cout << " ->" << e.vertexId;
+                if (withValue) std::cout << ", " << e.value;
             }
             std::cout << std::endl;
         }
@@ -378,14 +374,14 @@ public:
     /**
      * Print the graph on the screen as the outgoing edges.
      */
-    void printInEdges(bool withAttr = false) const {
+    void printInEdges(bool withValue = false) const {
         for (auto v : vertices) {
             std::cout << "[" << v.id;
-            if (withAttr) std::cout << ", " + v.attr;
+            if (withValue) std::cout << ", " + v.value;
             std::cout << "] ";
             for (auto e : v.inEdges) {
-                std::cout << " <-" << e.id;
-                if (withAttr) std::cout << ", " << e.attr;
+                std::cout << " <-" << e.vertexId;
+                if (withValue) std::cout << ", " << e.value;
             }
             std::cout << std::endl;
         }
@@ -404,12 +400,12 @@ public:
     }
 
     /** Shuffles the vertices. */
-    void shuffleVertices() {
+    inline void shuffleVertices() {
         std::random_shuffle(vertices.begin(), vertices.end());
     }
 
     /** Sorts the vertices by id. */
-    void sortVerticesById() {
+    inline void sortVerticesById() {
         std::stable_sort(vertices.begin(), vertices.end());
     }
 

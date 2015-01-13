@@ -12,22 +12,22 @@
 #include "common.h"
 
 /**
- *  An edge is ternary tuple (`srcId`, `dstId`, `attr`).
+ *  An edge is ternary tuple (`srcId`, `dstId`, `value`).
  *
- * @tparam ED type of the edge attribute
+ * @tparam EdgeValue type of the edge value
  */
-template<typename ED>
+template<typename EdgeValue>
 class EdgeTuple {
 public:
     VertexId srcId;     /** The vertex id of the source vertex */
     VertexId dstId;     /** The vertex id of the target vertex */
-    ED attr;            /** The attribute associated with the edge */
+    EdgeValue value;     /** The value associated with the edge */
 
     /** Constructor with all three parameters */
-    explicit EdgeTuple(VertexId src, VertexId dst, ED d) {
+    explicit EdgeTuple(VertexId src, VertexId dst, EdgeValue v) {
         srcId = src;
         dstId = dst;
-        attr  = d;
+        value  = v;
     }
 };
 

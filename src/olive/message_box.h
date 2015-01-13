@@ -21,15 +21,15 @@
  * message to local
  *
  * The pointer to message box can be accessed by GPU and CPU,
- * @tparam MSG The data type for message contained in the box.
+ * @tparam MessageValue The data type for message contained in the box.
  */
-template<typename MSG>
+template<typename MessageValue>
 class MessageBox {
 public:
-    MSG      *buffer;
-    MSG      *bufferRecv;   /** Using a double-buffering method. */
-    size_t    maxLength;    /** Maximum length of the buffer */
-    size_t    length;       /** Current capacity of the message box. */
+    MessageValue *buffer;
+    MessageValue *bufferRecv;   /** Using a double-buffering method. */
+    size_t        maxLength;    /** Maximum length of the buffer */
+    size_t        length;       /** Current capacity of the message box. */
 
     /**
      * Constructor. `deviceId < 0` if there is no memory reserved
@@ -43,9 +43,11 @@ public:
         maxLength = len;
         length = 0;
         CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **>(&buffer),
-                                  len * sizeof(MSG), cudaHostAllocPortable));
+                                  len * sizeof(MessageValue),
+                                  cudaHostAllocPortable));
         CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **>(&bufferRecv),
-                                  len * sizeof(MSG), cudaHostAllocPortable));
+                                  len * sizeof(MessageValue),
+                                  cudaHostAllocPortable));
     }
 
     /**
@@ -71,7 +73,7 @@ public:
 
         CUDA_CHECK(cudaMemcpyAsync(bufferRecv,
                                    other.buffer,
-                                   length * sizeof(MSG),
+                                   length * sizeof(MessageValue),
                                    cudaMemcpyDefault,
                                    stream));
 
@@ -81,7 +83,7 @@ public:
      * Exchanges two buffers.
      */
     inline void swapBuffers() {
-        MSG *temp = buffer;
+        MessageValue *temp = buffer;
         buffer = bufferRecv;
         bufferRecv = temp;
     }

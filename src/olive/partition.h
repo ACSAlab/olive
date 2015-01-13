@@ -215,11 +215,11 @@ public:
             vertices[vertexCursor] = edgeCursor;
             for (auto e : v.outEdges) {
                 Vertex dst;
-                if (subgraph.hasVertex(e.id)) {  // In this partition
+                if (subgraph.hasVertex(e.vertexId)) {  // In this partition
                     dst.partitionId = partitionId;
-                    dst.localId = toLocal[e.id];
+                    dst.localId = toLocal[e.vertexId];
                 } else {                         // In remote partition
-                    auto it = subgraph.ghostVertices.find(e.id);
+                    auto it = subgraph.ghostVertices.find(e.vertexId);
                     assert(it != subgraph.ghostVertices.end());
                     dst.partitionId = it->second.first;
                     dst.localId = it->second.second;
@@ -325,8 +325,8 @@ private:
 
         for (auto v : subgraph.vertices) {
             for (auto e : v.outEdges) {
-                if (!subgraph.hasVertex(e.id)) {
-                    auto it = subgraph.ghostVertices.find(e.id);
+                if (!subgraph.hasVertex(e.vertexId)) {
+                    auto it = subgraph.ghostVertices.find(e.vertexId);
                     assert(it != subgraph.ghostVertices.end());
                     PartitionId parTo = it->second.first;
                     assert(parTo < numParts);
@@ -334,8 +334,8 @@ private:
                 }
             }
             for (auto e : v.inEdges) {
-                if (!subgraph.hasVertex(e.id)) {
-                    auto it = subgraph.ghostVertices.find(e.id);
+                if (!subgraph.hasVertex(e.vertexId)) {
+                    auto it = subgraph.ghostVertices.find(e.vertexId);
                     assert(it != subgraph.ghostVertices.end());
                     PartitionId parFrom = it->second.first;
                     assert(parFrom < numParts);

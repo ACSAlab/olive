@@ -25,45 +25,40 @@
  * @param edgeContext  Edge computation context.
  * @param msgContext   Message packing and unpacking functions.
  */
-template<typename VertexValue,
-         typename MessageValue,
-         typename EdgeContext,
-         typename MessageContext>
+template<typename VertexValue, typename EdgeContext>
 __global__
-void expandKernel(
-    PartitionId thisPid,
+void edgeExpandKernel(
+    PartitionId  thisPid,
     const EdgeId *vertices,
     const Vertex *edges,
-    MessageBox< VertexMessage<MessageValue> > *outboxes,
+    MessageBox< VertexMessage<VertexValue> > *outboxes,
     int *workset,
-    VertexId *workqueue,
+    const VertexId *workqueue,
     int queueSize,
     VertexValue *vertexValues,
-    EdgeContext edgeContext,
-    MessageContext msgContext)
+    EdgeContext edgeContext)
 {
     int tid = THREAD_INDEX;
     if (tid >= queueSize) return;
-    VertexId outNode = workqueue[tid];
-    EdgeId first = vertices[outNode];
-    EdgeId last = vertices[outNode + 1];
+    VertexId srcId = workqueue[tid];
+    EdgeId first = vertices[srcId];
+    EdgeId last = vertices[srcId + 1];
 
     for (EdgeId edge = first; edge < last; edge ++) {
-        PartitionId pid = edges[edge].partitionId;
-        if (pid == thisPid) {  // In this partition
-            VertexId inNode = edges[edge].localId;
-            if (edgeContext.pred(vertexValues[inNode])) {
-                vertexValues[inNode] = edgeContext.update(vertexValues[outNode]);
-                workset[inNode] = 1;
+        PartitionId dstPid = edges[edge].partitionId;
+        if (dstPid == thisPid) {  // In this partition
+            VertexId dstId = edges[edge].localId;
+            if (edgeContext.pred(vertexValues[dstId])) {
+                vertexValues[dstId] = edgeContext.update(vertexValues[srcId]);
+                workset[dstId] = 1;
             }
         } else {  // In remote partition
-            VertexMessage<MessageValue> msg;
+            VertexMessage<VertexValue> msg;
             msg.receiverId = edges[edge].localId;
-            msg.value      = msgContext.pack(vertexValues[outNode]);
+            msg.value      = vertexValues[srcId];
 
-            size_t offset = atomicAdd(reinterpret_cast<unsigned long long *>
-                (&outboxes[pid].length), 1);
-            outboxes[pid].buffer[offset] = msg;
+            size_t offset = atomicAdd(reinterpret_cast<unsigned long long *> (&outboxes[dstPid].length), 1);
+            outboxes[dstPid].buffer[offset] = msg;
         }
     }
 }
@@ -80,26 +75,23 @@ void expandKernel(
  * @param messageContext Use to convert the message content to vertex value.
  */
 template<typename VertexValue,
-         typename MessageValue,
-         typename EdgeContext,
-         typename MessageContext>
+         typename EdgeContext>
 __global__
-void scatterKernel(
-    MessageBox< VertexMessage<MessageValue> > &inbox,
+void edgeScatterKernel(
+    const MessageBox< VertexMessage<VertexValue> > &inbox,
     VertexValue *vertexValues,
     int *workset,
-    EdgeContext edgeContext,
-    MessageContext msgContext)
+    EdgeContext edgeContext)
 {
     int tid = THREAD_INDEX;
     if (tid >= inbox.length) return;
 
-    VertexId inNode = inbox.buffer[tid].receiverId;
-    VertexValue newValue = msgContext.unpack(inbox.buffer[tid].value);
+    VertexId dstId = inbox.buffer[tid].receiverId;
+    VertexValue newValue = inbox.buffer[tid].value;
 
-    if (edgeContext.pred(vertexValues[inNode])) {
-        vertexValues[inNode] = edgeContext.update(newValue);
-        workset[inNode] = 1;
+    if (edgeContext.pred(vertexValues[dstId])) {
+        vertexValues[dstId] = edgeContext.update(newValue);
+        workset[dstId] = 1;
     }
 }
 
@@ -114,7 +106,7 @@ void scatterKernel(
  * 
  */
 __global__
-void compactKernel(
+void edgeCompactKernel(
     int *workset,
     size_t worksetSize,
     VertexId *workqueue,
@@ -124,8 +116,7 @@ void compactKernel(
     if (tid >= worksetSize) return;
     if (workset[tid] == 1) {
         workset[tid] = 0;
-        size_t offset = atomicAdd(reinterpret_cast<unsigned long long *>
-            (workqueueSize), 1);
+        size_t offset = atomicAdd(reinterpret_cast<unsigned long long *>(workqueueSize), 1);
         workqueue[offset] = tid;
     }
 }
