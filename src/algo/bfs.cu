@@ -6,10 +6,10 @@
  * Last Modified: 2014-12-18
  */
 
-#include "algo_common.h"
+#include "common.h"
 #include "bfs_top_down.h"
 #include "bfs_serial.h"
-#include "bfs_distributed.h"
+#include "bfs_olive.h"
 
 int main(int argc, char **argv) {
 
@@ -28,10 +28,10 @@ int main(int argc, char **argv) {
 
     auto serial_levels = bfs_serial(single_par, graph.nodes(), src);
     auto top_down_levels = bfs_top_down(single_par, graph.nodes(), src);
-    auto distributed_levels = bfs_distributed(argv[1], 2, src);
+    auto olive_levels = bfs_olive(argv[1], 2, src);
     
     expect_equal(serial_levels, top_down_levels);
-    expect_equal(serial_levels, distributed_levels);
+    expect_equal(serial_levels, olive_levels);
 
     printf("Hopefully, nothing goes wrong.");
     return 0;

@@ -16,13 +16,33 @@
 #include <iostream>
 
 #include "common.h"
-#include "edge_tuple.h"
-#include "partition_strategy.h"
+#include "partitionStrategy.h"
 #include "logging.h"
 #include "utils.h"
 
 
 namespace flex {
+
+/**
+ *  An edge is ternary tuple (`srcId`, `dstId`, `value`).
+ *
+ * @tparam EdgeValue type of the edge value
+ */
+template<typename EdgeValue>
+class EdgeTuple {
+public:
+    VertexId srcId;     /** The vertex id of the source vertex */
+    VertexId dstId;     /** The vertex id of the target vertex */
+    EdgeValue value;     /** The value associated with the edge */
+
+    /** Constructor with all three parameters */
+    explicit EdgeTuple(VertexId src, VertexId dst, EdgeValue v) {
+        srcId = src;
+        dstId = dst;
+        value  = v;
+    }
+};
+
 /**
  * Directed edge structure for flexible graph representation.
  * Each edge contains an vertex id for either its destination or its source,

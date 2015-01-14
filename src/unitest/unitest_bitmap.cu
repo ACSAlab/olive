@@ -12,7 +12,7 @@
 #include <algorithm>
 
 #include "bitmap.h"
-#include "unitest_common.h"
+#include "common.h"
 
 #define MAXLEN 512
 

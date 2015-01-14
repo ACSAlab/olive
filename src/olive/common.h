@@ -36,9 +36,6 @@ typedef uint32_t EdgeId;
 /** Defines the type for the partition identifier. */
 typedef uint32_t PartitionId;
 
-
-
-
 /**
  * Constants for kernel configuration.
  */

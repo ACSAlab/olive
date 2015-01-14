@@ -6,28 +6,17 @@
  * Last Modified: 2014-12-20
  */
 
-#ifndef ENGINE_KERNEL_H
-#define ENGINE_KERNEL_H
+#ifndef OLIVE_KERNEL_H
+#define OLIVE_KERNEL_H
 
 #include "common.h"
 
 /**
- * The CUDA kernel for expanding vertices in the work set.
- *
- * @param thisPid      My partition id.
- * @param vertices     Represents the out-going edges.
- * @param edges        Represent the destination vertices.
- * @param outboxes     Outboxes to all remote partitions.
- * @param workset      Bit-set representation of the work set
- * @param workqueue    Queue representation of the work set
- * @param n            The number of the vertices in the `workqueue`.
- * @param vertexValues Buffer for the local vertex states.
- * @param edgeContext  Edge computation context.
- * @param msgContext   Message packing and unpacking functions.
+ * The CUDA kernel for expanding vertices in the work queue.
  */
 template<typename VertexValue, typename EdgeContext>
 __global__
-void edgeExpandKernel(
+void edgeFilterExpandKernel(
     PartitionId  thisPid,
     const EdgeId *vertices,
     const Vertex *edges,
@@ -64,49 +53,11 @@ void edgeExpandKernel(
 }
 
 /**
- * The CUDA kernel for scattering messages to local vertex values.
- * Usually invoked after all-to-all message passing.
- *
- * @param inbox          The message box received from remote partitions.
- *                       Must be accessible from CUDA context.
- * @param vertexValues   The buffer for the vertex values.
- * @param workset        Bit-set representation of the work set.
- * @param edgeContext    The edge computation context.
- * @param messageContext Use to convert the message content to vertex value.
- */
-template<typename VertexValue,
-         typename EdgeContext>
-__global__
-void edgeScatterKernel(
-    const MessageBox< VertexMessage<VertexValue> > &inbox,
-    VertexValue *vertexValues,
-    int *workset,
-    EdgeContext edgeContext)
-{
-    int tid = THREAD_INDEX;
-    if (tid >= inbox.length) return;
-
-    VertexId dstId = inbox.buffer[tid].receiverId;
-    VertexValue newValue = inbox.buffer[tid].value;
-
-    if (edgeContext.pred(vertexValues[dstId])) {
-        vertexValues[dstId] = edgeContext.update(newValue);
-        workset[dstId] = 1;
-    }
-}
-
-/**
  * The CUDA kernel for converting the work set to the work queue.
  * Using 32-bit int to represent 1-bit can avoid atomic operations.
- *  
- * @param workset       Buffer for the bit-set-based work set.
- * @param worksetSize   Bit-set length.
- * @param workqueue     Buffer for the queue-based work set.
- * @param workqueueSize Queue length.
- * 
  */
 __global__
-void edgeCompactKernel(
+void edgeFilterCompactKernel(
     int *workset,
     size_t worksetSize,
     VertexId *workqueue,
@@ -120,6 +71,36 @@ void edgeCompactKernel(
         workqueue[offset] = tid;
     }
 }
+
+/**
+ * The CUDA kernel for scattering messages to local vertex values.
+ * The edgeMap and edgeFilter reuse the same code piece and differentiate
+ * by a template flag `VertexFiltered`.
+ */
+template<typename VertexValue, typename EdgeContext, bool VertexFiltered>
+__global__
+void scatterKernel(
+    const MessageBox< VertexMessage<VertexValue> > &inbox,
+    VertexValue *vertexValues,
+    int *workset,
+    EdgeContext edgeContext)
+{
+    int tid = THREAD_INDEX;
+    if (tid >= inbox.length) return;
+
+    VertexId dstId = inbox.buffer[tid].receiverId;
+    VertexValue srcValue = inbox.buffer[tid].value;
+
+    if (edgeContext.pred(vertexValues[dstId])) {
+        vertexValues[dstId] = edgeContext.update(srcValue);
+
+        // Evaluated at compile time
+        if (VertexFiltered) {
+            workset[dstId] = 1;
+        }
+    }
+}
+
 
 /**
  * The vertex map kernel.
@@ -137,7 +118,6 @@ void vertexMapKernel(
     if (tid >= verticeCount) return;
     vertexValues[tid] = f(vertexValues[tid]);
 }
-
 
 /**
  * The vertex filter kernel.
@@ -163,4 +143,4 @@ void vertexFilterKernel(
     }
 }
 
-#endif  // ENGINE_KERNEL_H
+#endif  // OLIVE_KERNEL_H

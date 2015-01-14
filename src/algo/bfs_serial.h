@@ -21,8 +21,7 @@
  * @return a vector containing the BFS level for each node.
  */
 std::vector<int> bfs_serial(const Partition<int, int> &partition,
-    VertexId nodes, VertexId source) {
-
+                            VertexId nodes, VertexId source) {
     GRD<int> levels;
     levels.reserve(nodes);
     levels.allTo(INF);
@@ -36,17 +35,17 @@ std::vector<int> bfs_serial(const Partition<int, int> &partition,
     levels.set(source, 0);
     visited.set(source, 1);
 
-    while(!current.empty()) {
+    while (!current.empty()) {
         // Dequeue
         VertexId outNode = current.front();
         current.pop_front();
 
         EdgeId first = partition.vertices[outNode];
-        EdgeId last = partition.vertices[outNode+1];
+        EdgeId last = partition.vertices[outNode + 1];
         for (EdgeId edge = first; edge < last; edge ++) {
             VertexId inNode = partition.edges[edge].localId;
             if (visited[inNode] == 0) {
-                levels[inNode] = levels[outNode] + 1; 
+                levels[inNode] = levels[outNode] + 1;
                 current.push_back(inNode);
                 visited[inNode] = 1;
             }

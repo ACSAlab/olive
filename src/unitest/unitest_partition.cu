@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "partition.h"
-#include "unitest_common.h"
+#include "common.h"
 
 void print_paritition(const Partition<int, int> &partition) {
 

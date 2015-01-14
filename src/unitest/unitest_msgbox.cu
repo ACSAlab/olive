@@ -7,7 +7,7 @@
  * Last Modified: 2014-11-23
  */
 
-#include "message_box.h"
+#include "messageBox.h"
 #include "utils.h"
 
 __global__
