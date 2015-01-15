@@ -1,5 +1,5 @@
 /**
- * Message box contains the
+ * Message box
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
  * Created on: 2014-11-28

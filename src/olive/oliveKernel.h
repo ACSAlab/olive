@@ -11,64 +11,90 @@
 
 #include "common.h"
 
-/**
- * The CUDA kernel for expanding vertices in the work queue.
- */
-template<typename VertexValue, typename EdgeContext>
+
+template<typename VertexValue,
+         typename AccumValue,
+         typename EdgeFunction>
 __global__
-void edgeFilterExpandKernel(
+void edgeGatherDenseKernel(
     PartitionId  thisPid,
     const EdgeId *vertices,
     const Vertex *edges,
-    MessageBox< VertexMessage<VertexValue> > *outboxes,
-    int *workset,
-    const VertexId *workqueue,
-    int queueSize,
+    MessageBox< VertexMessage<AccumValue> > *outboxes,
+    VertexId vertexCount,
     VertexValue *vertexValues,
-    EdgeContext edgeContext)
+    AccumValue *accumulators,
+    EdgeFunction edgeFunc)
 {
     int tid = THREAD_INDEX;
-    if (tid >= queueSize) return;
-    VertexId srcId = workqueue[tid];
-    EdgeId first = vertices[srcId];
-    EdgeId last = vertices[srcId + 1];
+    if (tid >= vertexCount) return;
+    VertexValue srcValue = vertexValues[tid];
+    EdgeId first = vertices[tid];
+    EdgeId last = vertices[tid + 1];
+    EdgeId outdegree = last - first + 1;
 
     for (EdgeId edge = first; edge < last; edge ++) {
         PartitionId dstPid = edges[edge].partitionId;
+        // Edge level parallelism, which is exploited by SIMD lanes
+        AccumValue accum = edgeFunc.gather(srcValue, outdegree);
+
         if (dstPid == thisPid) {  // In this partition
             VertexId dstId = edges[edge].localId;
-            if (edgeContext.pred(vertexValues[dstId])) {
-                vertexValues[dstId] = edgeContext.update(vertexValues[srcId]);
-                workset[dstId] = 1;
-            }
+            edgeFunc.reduce(accumulators[dstId], accum);
         } else {  // In remote partition
-            VertexMessage<VertexValue> msg;
+            VertexMessage<AccumValue> msg;
             msg.receiverId = edges[edge].localId;
-            msg.value      = vertexValues[srcId];
-
-            size_t offset = atomicAdd(reinterpret_cast<unsigned long long *> (&outboxes[dstPid].length), 1);
+            msg.value      = accum;
+            size_t offset = atomicAdd(reinterpret_cast<unsigned long long *>
+                                      (&outboxes[dstPid].length), 1);
             outboxes[dstPid].buffer[offset] = msg;
         }
     }
 }
 
+
 /**
- * The CUDA kernel for converting the work set to the work queue.
- * Using 32-bit int to represent 1-bit can avoid atomic operations.
+ * The CUDA kernel for expanding vertices in the work queue.
  */
+template<typename VertexValue,
+         typename AccumValue,
+         typename EdgeFunction>
 __global__
-void edgeFilterCompactKernel(
-    int *workset,
-    size_t worksetSize,
-    VertexId *workqueue,
-    size_t *workqueueSize)
+void edgeGatherSparseKernel(
+    PartitionId  thisPid,
+    const EdgeId *vertices,
+    const Vertex *edges,
+    MessageBox< VertexMessage<AccumValue> > *outboxes,
+    const VertexId *workqueue,
+    int queueSize,
+    VertexValue *vertexValues,
+    AccumValue *accumulators,
+    EdgeFunction edgeFunc)
 {
     int tid = THREAD_INDEX;
-    if (tid >= worksetSize) return;
-    if (workset[tid] == 1) {
-        workset[tid] = 0;
-        size_t offset = atomicAdd(reinterpret_cast<unsigned long long *>(workqueueSize), 1);
-        workqueue[offset] = tid;
+    if (tid >= queueSize) return;
+    VertexId srcId = workqueue[tid];
+    VertexValue srcValue = vertexValues[srcId];
+    EdgeId first = vertices[srcId];
+    EdgeId last = vertices[srcId + 1];
+    EdgeId outdegree = last - first + 1;
+
+    for (EdgeId edge = first; edge < last; edge ++) {
+        PartitionId dstPid = edges[edge].partitionId;
+        // Edge level parallelism, which is exploited by SIMD lanes
+        AccumValue accum = edgeFunc.gather(srcValue, outdegree);
+
+        if (dstPid == thisPid) {  // In this partition
+            VertexId dstId = edges[edge].localId;
+            edgeFunc.reduce(accumulators[dstId], accum);
+        } else {  // In remote partition
+            VertexMessage<AccumValue> msg;
+            msg.receiverId = edges[edge].localId;
+            msg.value      = accum;
+            size_t offset = atomicAdd(reinterpret_cast<unsigned long long *>
+                                      (&outboxes[dstPid].length), 1);
+            outboxes[dstPid].buffer[offset] = msg;
+        }
     }
 }
 
@@ -77,46 +103,38 @@ void edgeFilterCompactKernel(
  * The edgeMap and edgeFilter reuse the same code piece and differentiate
  * by a template flag `VertexFiltered`.
  */
-template<typename VertexValue, typename EdgeContext, bool VertexFiltered>
+template<typename AccumValue, typename EdgeFunction>
 __global__
-void scatterKernel(
-    const MessageBox< VertexMessage<VertexValue> > &inbox,
-    VertexValue *vertexValues,
-    int *workset,
-    EdgeContext edgeContext)
+void edgeScatterKernel(
+    const MessageBox< VertexMessage<AccumValue> > &inbox,
+    AccumValue *accumulators,
+    EdgeFunction edgeFunc)
 {
     int tid = THREAD_INDEX;
     if (tid >= inbox.length) return;
-
     VertexId dstId = inbox.buffer[tid].receiverId;
-    VertexValue srcValue = inbox.buffer[tid].value;
-
-    if (edgeContext.pred(vertexValues[dstId])) {
-        vertexValues[dstId] = edgeContext.update(srcValue);
-
-        // Evaluated at compile time
-        if (VertexFiltered) {
-            workset[dstId] = 1;
-        }
-    }
+    AccumValue accum = inbox.buffer[tid].value;
+    edgeFunc.reduce(accumulators[dstId], accum);
 }
-
 
 /**
  * The vertex map kernel.
  *
  * @param f   A user-defined functor to update the vertex state.
  */
-template<typename VertexFunction, typename VertexValue>
+template<typename VertexValue,
+         typename AccumValue,
+         typename VertexFunction>
 __global__
 void vertexMapKernel(
     VertexValue *vertexValues,
     int verticeCount,
+    AccumValue *accumulators,    
     VertexFunction f)
 {
     int tid = THREAD_INDEX;
     if (tid >= verticeCount) return;
-    vertexValues[tid] = f(vertexValues[tid]);
+    f(vertexValues[tid], accumulators[tid]);
 }
 
 /**
@@ -125,22 +143,31 @@ void vertexMapKernel(
  * @param id  The id of the vertex to filter out.
  * @param f   A user-defined functor to update the vertex state.
  */
-template<typename VertexFunction, typename VertexValue>
+template<typename VertexValue,
+         typename AccumValue,
+         typename VertexFunction>
 __global__
 void vertexFilterKernel(
-    const VertexId *globalIds,
+    int *workset,
     int vertexCount,
-    VertexId FilterId,
+    VertexId *workqueue,
+    VertexId *workqueueSize,
     VertexValue *vertexValues,
-    VertexFunction f,
-    int *workset)
+    AccumValue *accumulators,
+    VertexFunction f)
 {
     int tid = THREAD_INDEX;
     if (tid >= vertexCount) return;
-    if (globalIds[tid] == FilterId) {
-        vertexValues[tid] = f(vertexValues[tid]);
-        workset[tid] = 1;
+
+    f.update(vertexValues[tid], accumulators[tid]);
+
+    if (f.cond(vertexValues[tid]) == true) {
+        VertexId offset = atomicAdd(reinterpret_cast<unsigned long long *>
+                                   (workqueueSize), 1);
+        workqueue[offset] = tid;
     }
 }
+
+
 
 #endif  // OLIVE_KERNEL_H

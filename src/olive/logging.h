@@ -31,7 +31,7 @@ private:
 public:
     /** Output when destroyed. */
     ~Logging() {
-        if (messageLevel >= Logging::ReportingLevel()) {
+        if (messageLevel <= Logging::ReportingLevel()) {
             os << std::endl;
             fprintf(stderr, "%s", os.str().c_str());
             fflush(stderr);
@@ -71,7 +71,7 @@ private:
 };
 
 /** Macro for easy use  */
-LogLevel Logging::reportingLevel = ERROR;
+LogLevel Logging::reportingLevel = INFO;
 
 /** Macro for easy use  */
 #define LOG(level) Logging().Get(level)

@@ -66,7 +66,7 @@ public:
  * in a graph partition. e.g. The ids are continuous from 0 to `vertices`-1;
  *
  */
-template<typename VertexValue, typename MessageValue>
+template<typename VertexValue, typename AccumValue>
 class Partition {
 public:
 
@@ -119,6 +119,11 @@ public:
     GRD<VertexValue> vertexValues;
 
     /**
+     * For each vertex an accumulator is cached to perform computation.
+     */
+    GRD<AccumValue> accumulators;
+
+    /**
      * Use a bitmap to represent the working set.
      */
     GRD<int>       workset;
@@ -127,8 +132,8 @@ public:
      * Use a queue to keep the work complexity low
      */
     GRD<VertexId>  workqueue;
-    size_t        *workqueueSize;       /** queue size */
-    size_t        *workqueueSizeDevice; /** queue size device */
+    VertexId      *workqueueSize;       /** queue size */
+    VertexId      *workqueueSizeDevice; /** queue size device */
 
     /**
      * Messages sending to remote vertices are inserted into corresponding
@@ -139,12 +144,12 @@ public:
      * reserved for the local partition (do not allocate memory).
      * e.g. for partition 2, outboxes[0/1/3] is effective.
      */
-    MessageBox< VertexMessage<MessageValue> > *outboxes;
+    MessageBox< VertexMessage<AccumValue> > *outboxes;
 
     /**
      * Messages received from remote vertices.
      */
-    MessageBox< VertexMessage<MessageValue> > *inboxes;
+    MessageBox< VertexMessage<AccumValue> > *inboxes;
 
     /**
      * Enables overlapped communication and computation.
@@ -221,11 +226,12 @@ public:
         edges.reserve(edgeCount, deviceId);
         globalIds.reserve(vertexCount, deviceId);
         vertexValues.reserve(vertexCount, deviceId);
+        accumulators.reserve(vertexCount, deviceId);
         workqueue.reserve(vertexCount, deviceId);
         workset.reserve(vertexCount, deviceId);
-        workqueueSize = static_cast<size_t *> (malloc(sizeof(size_t)));
+        workqueueSize = static_cast<VertexId *> (malloc(sizeof(VertexId)));
         CUDA_CHECK(cudaMalloc(reinterpret_cast<void **> (&workqueueSizeDevice),
-                              sizeof(size_t)));
+                              sizeof(VertexId)));
 
         double allocTime = stopwatch.elapsedMillis();
 
@@ -269,7 +275,7 @@ public:
         edges.cache();
         globalIds.cache();
         *workqueueSize = 0;
-        CUDA_CHECK(H2D(workqueueSizeDevice, workqueueSize, sizeof(size_t)));
+        CUDA_CHECK(H2D(workqueueSizeDevice, workqueueSize, sizeof(VertexId)));
         workset.allTo(0);
         double cacheTime = stopwatch.elapsedMillis();
 
@@ -347,10 +353,10 @@ private:
         // The pointers are allocated in pinned memory so that they can be
         // accessed as outboxes[i] in any CUDA contexts.
         CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **> (&outboxes),
-                                  sizeof(MessageBox< VertexMessage<MessageValue> >) * numParts,
+                                  sizeof(MessageBox< VertexMessage<AccumValue> >) * numParts,
                                   cudaHostAllocPortable));
         CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **> (&inboxes),
-                                  sizeof(MessageBox< VertexMessage<MessageValue> >) * numParts,
+                                  sizeof(MessageBox< VertexMessage<AccumValue> >) * numParts,
                                   cudaHostAllocPortable));
 
         for (auto v : subgraph.vertices) {
