@@ -42,6 +42,9 @@
 #include "partition.h"
 #include "partitionStrategy.h"
 #include "logging.h"
+#include "timer.h"
+#include "utils.h"
+#include "commandLine.h"
 #include "oliveKernel.h"
 
 
@@ -64,7 +67,7 @@ public:
             gatherLaunched[i] = true;
             scatterLaunched[i] = true;
         }
-        double startTime = util::currentTimeMillis();
+        double startTime = getTimeMillis();
 
         //  Clear the accumulator before the computation starts
         for (int i = 0; i < partitions.size(); i++) {
@@ -214,7 +217,7 @@ public:
         //////////////////////////////  Profiling  /////////////////////////////
         // Collect the execution time for each computing kernel.
         // Choose the lagging one to represent the computation time.
-        double totalTime = util::currentTimeMillis() - startTime;
+        double totalTime = getTimeMillis() - startTime;
         double maxCompTime = 0.0;
         for (int i = 0; i < partitions.size(); i++) {
             float compTime;

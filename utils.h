@@ -34,7 +34,6 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include <sys/time.h>
 #include <utility>
 
 #include "cuda_runtime.h"
@@ -166,42 +165,6 @@ size_t hashCode(size_t a) {
     return a;
 }
 
-
-/** Get current time in milliseconds */
-double currentTimeMillis() {
-    timeval t;
-    gettimeofday(&t, NULL);
-    double millis = static_cast<double> (t.tv_sec * 1000.0);
-    millis += static_cast<double >(t.tv_usec / 1000.0);
-    return millis;
-}
-
-/** Get current time in milliseconds */
-double currentTimeSeconds() {
-    timeval t;
-    gettimeofday(&t, NULL);
-    double seconds = static_cast<double> (t.tv_sec);
-    seconds += static_cast<double>(t.tv_usec / 1000000.0);
-    return seconds;
-}
-
-/** The Stopwatch returns the elapsed time to last time when it stops */
-class Stopwatch {
-private:
-    double timer_;
-
-public:
-    void start() {
-        timer_ = currentTimeMillis();
-    }
-
-    double elapsedMillis() {
-        double now = currentTimeMillis();
-        double elapsed = now - timer_;
-        timer_ = now;
-        return elapsed;
-    }
-};
 
 
 }  // namespace util

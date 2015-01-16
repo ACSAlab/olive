@@ -44,6 +44,7 @@
 #include "partitionStrategy.h"
 #include "logging.h"
 #include "utils.h"
+#include "timer.h"
 
 
 namespace flex {
@@ -328,7 +329,7 @@ public:
         char temp[1024];                // Shadows the line in a temp buffer
         char *token;                    // Points to the parsed token
         char *remaining;                // Points to the remaining line
-        double startTime = util::currentTimeMillis();
+        double startTime = getTimeMillis();
 
         while (fgets(line, 1024, fileHandler) != NULL) {
             if (line[0] != '\0' && line[0] != '#') {
@@ -353,7 +354,7 @@ public:
                 }
             }
         }
-        LOG(INFO) << "It took " << util::currentTimeMillis() - startTime
+        LOG(INFO) << "It took " << getTimeMillis() - startTime
                   << "ms to load the edge list.";
     }
 
@@ -374,7 +375,7 @@ public:
         PartitionId numParts)
     {
         assert(numParts != 0);
-        double startTime = util::currentTimeMillis();
+        double startTime = getTimeMillis();
 
         // Sort before partition since we want to map local id to global
         sortVerticesById();
@@ -395,7 +396,7 @@ public:
                 subgraphs[i].ghostVertices[v.id] = ghost;
             }
         }
-        LOG(INFO) << "It took " << util::currentTimeMillis() - startTime
+        LOG(INFO) << "It took " << getTimeMillis() - startTime
                   << "ms to partition the graph.";
         return subgraphs;
     }

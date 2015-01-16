@@ -85,13 +85,12 @@ struct PR_at_F {
 
 int main(int argc, char **argv) {
 
-    if (argc < 2) {
-        printf("wrong argument");
-        return 1;
-    }
+    CommandLine cl(argc, argv, "<inFile> [-rounds 10]");
+    char * inFile = cl.getArgument(0);
+    int rounds = cl.getOptionIntValue("-rounds", 10);
 
     Olive<PR_Vertex, float> olive;
-    olive.init(argv[1], 2);
+    olive.init(inFile, 2);
     VertexId n = olive.getVertexCount();
 
     // The final result, which will be aggregated.
@@ -105,7 +104,7 @@ int main(int argc, char **argv) {
     }
 
     int iterations = 0;
-    while (iterations <= 20) {
+    while (iterations <= rounds) {
         printf("\n\n\niterations: %d worksize: %d\n",
                iterations++,
                olive.getWorksetSize());

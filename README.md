@@ -19,7 +19,7 @@ Olive provides a handful of graph examples (located in `/data`) for quick test.Y
 
 For some applications, like BFS, a `-s` flag (followed by an integer to indicate the source vertex) is also necessary. For example:
 
-    $./BFS ./data/completeGraph_300 -s 24
+    $./BFS ./data/maxflowGraph_100 -s 24
 
 ## Olive Abstraction
 

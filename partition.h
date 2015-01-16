@@ -44,6 +44,7 @@
 #include "utils.h"
 #include "logging.h"
 #include "messageBox.h"
+#include "timer.h"
 
 /**
  * If a vertex's `partitionId` equals the partition's `partitionId`, then it
@@ -232,8 +233,8 @@ public:
             << vertexCount << ", #edges= " << edgeCount;
         }
 
-        double startTime = util::currentTimeMillis();
-        util::Stopwatch stopwatch;
+        double startTime = getTimeMillis();
+        Stopwatch stopwatch;
         stopwatch.start();
 
         // Sets up the CUDA resources.
@@ -258,7 +259,7 @@ public:
         CUDA_CHECK(cudaMalloc(reinterpret_cast<void **> (&workqueueSizeDevice),
                               sizeof(VertexId)));
 
-        double allocTime = stopwatch.elapsedMillis();
+        double allocTime = stopwatch.getElapsedMillis();
 
         // Maps the global ids to local ids. Used to create remote vertex.
         std::map<VertexId, VertexId> toLocal;
@@ -293,7 +294,7 @@ public:
         vertices[vertexCursor] = edgeCursor;  // Close the edge
         assert(vertexCount == vertexCursor);
         assert(edgeCount == edgeCursor);
-        double indexTime = stopwatch.elapsedMillis();
+        double indexTime = stopwatch.getElapsedMillis();
 
         // Transfer all the buffers to GPU.
         vertices.cache();
@@ -302,13 +303,13 @@ public:
         *workqueueSize = 0;
         CUDA_CHECK(H2D(workqueueSizeDevice, workqueueSize, sizeof(VertexId)));
         workset.allTo(0);
-        double cacheTime = stopwatch.elapsedMillis();
+        double cacheTime = stopwatch.getElapsedMillis();
 
         // Initialize the message boxes accordingly.
         initMessageBoxes(subgraph);
-        double msgboxTime = stopwatch.elapsedMillis();
+        double msgboxTime = stopwatch.getElapsedMillis();
 
-        double totalTime = util::currentTimeMillis() - startTime;
+        double totalTime = getTimeMillis() - startTime;
         LOG(INFO) << "It took " << std::setprecision(3) << totalTime
                   << "ms to land partition" << partitionId
                   << "(V=" << vertexCount << ", E=" << edgeCount
