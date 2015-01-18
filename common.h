@@ -46,6 +46,7 @@
 
 #include "cuda_runtime.h"
 
+
 /** One word equals 64 bit. */
 typedef uint64_t Word;
 

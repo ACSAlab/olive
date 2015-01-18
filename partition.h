@@ -2,17 +2,17 @@
  * The MIT License (MIT)
  *
  * Copyright (c) 2015 Yichao Cheng
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -117,7 +117,7 @@ public:
      *
      * @note a.k.a row offsets in matrix terminology.
      */
-    GRD<EdgeId>    vertices;
+    GRD<EdgeId> vertices;
 
     /**
      * Stores the destination vertex to represent an outgoing edge.
@@ -131,13 +131,13 @@ public:
      *
      * @note a.k.a column indices in matrix terminology.
      */
-    GRD<Vertex>    edges;
+    GRD<Vertex> edges;
 
     /**
      * Mapping the local linear ids in a partition to original ids when
      * aggregating the final results.
      */
-    GRD<VertexId>  globalIds;
+    GRD<VertexId> globalIds;
 
     /**
      * Partition-wise vertex state values.
@@ -152,15 +152,21 @@ public:
     /**
      * Use a bitmap to represent the working set.
      */
-    GRD<int>       workset;
+    GRD<int> workset;
 
     /**
      * Use a queue to keep the work complexity low
      */
     GRD<VertexId>  workqueue;
-    VertexId      *workqueueSize;       /** queue size */
-    VertexId      *workqueueSizeDevice; /** queue size device */
+    VertexId *workqueueSize;
+    VertexId *workqueueSizeDevice;
 
+    /**
+     * A single variable to indicate the activeness of all vertices
+     * in the partition.
+     */
+    bool *allVerticesInactive;
+    bool *allVerticesInactiveDevice;
     /**
      * Messages sending to remote vertices are inserted into corresponding
      * `outboxes`. The number of outboxes is equal to the number of partitions
@@ -182,28 +188,33 @@ public:
      * The computation and communication within the same stream is sequential.
      * And different streams can overlap.
      */
-    cudaStream_t    streams[2];
+    cudaStream_t streams[2];
 
     /**
      * Measures the execution time of a certain kernel.
      */
-    cudaEvent_t     startEvents[4];
-    cudaEvent_t     endEvents[4];
+    cudaEvent_t startEvents[4];
+    cudaEvent_t endEvents[4];
+    bool        kernelLaunched[4];  // To mask off the cudaEventElapsed API.
 
     /**
      * Constructor
-     * It is important to give a NULL value to avoid delete a effective pointer.
      */
     Partition() {
         deviceId = -1;
         partitionId = 0;
         numParts = 0;
+        // Manually managed pointers. It is important to give a NULL value
+        // to avoid delete a effective pointer.
         outboxes = NULL,
         inboxes = NULL;
         workqueueSize = NULL;
         workqueueSizeDevice = NULL;
-        streams[0] = NULL;
-        streams[1] = NULL;
+        allVerticesInactive = NULL;
+        allVerticesInactiveDevice = NULL;
+        for (int i = 0; i < 2; i++) {
+            streams[i] = NULL;
+        }
         for (int i = 0; i < 4; i++) {
             startEvents[i] = NULL;
             endEvents[i] = NULL;
@@ -230,7 +241,7 @@ public:
         // Only reserve memory if the graph has at least one edge/node
         if (edgeCount == 0 || vertexCount == 0) {
             LOG(WARNING) << "Parition" << partitionId << " #vertices= "
-            << vertexCount << ", #edges= " << edgeCount;
+                         << vertexCount << ", #edges= " << edgeCount;
         }
 
         double startTime = getTimeMillis();
@@ -256,8 +267,11 @@ public:
         workqueue.reserve(vertexCount, deviceId);
         workset.reserve(vertexCount, deviceId);
         workqueueSize = static_cast<VertexId *> (malloc(sizeof(VertexId)));
+        allVerticesInactive = static_cast<bool *> (malloc(sizeof(bool)));
         CUDA_CHECK(cudaMalloc(reinterpret_cast<void **> (&workqueueSizeDevice),
                               sizeof(VertexId)));
+        CUDA_CHECK(cudaMalloc(reinterpret_cast<void **> (&allVerticesInactiveDevice),
+                              sizeof(bool)));
 
         double allocTime = stopwatch.getElapsedMillis();
 
@@ -323,14 +337,15 @@ public:
     /** Destructor **/
     ~Partition() {
         if (deviceId >= 0) CUDA_CHECK(cudaSetDevice(deviceId));
-        // if (outboxes)   delete[] outboxes;
-        // if (inboxes)    delete[] inboxes;
         if (outboxes) CUDA_CHECK(cudaFreeHost(outboxes));
         if (inboxes) CUDA_CHECK(cudaFreeHost(inboxes));
-        if (streams[0]) CUDA_CHECK(cudaStreamDestroy(streams[0]));
-        if (streams[1]) CUDA_CHECK(cudaStreamDestroy(streams[1]));
         if (workqueueSize) free(workqueueSize);
         if (workqueueSizeDevice) CUDA_CHECK(cudaFree(workqueueSizeDevice));
+        if (allVerticesInactive) free(allVerticesInactive);
+        if (allVerticesInactiveDevice) CUDA_CHECK(cudaFree(allVerticesInactiveDevice));
+        for (int i = 0; i < 2; i++) {
+            if (streams[i]) CUDA_CHECK(cudaStreamDestroy(streams[i]));
+        }
         for (int i = 0; i < 4; i++) {
             if (startEvents[i]) CUDA_CHECK(cudaEventDestroy(startEvents[i]));
             if (endEvents[i])   CUDA_CHECK(cudaEventDestroy(endEvents[i]));

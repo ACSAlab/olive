@@ -95,8 +95,7 @@ private:
     }
 };
 
-/** Macro for easy use  */
-LogLevel Logging::reportingLevel = INFO;
+LogLevel Logging::reportingLevel = DEBUG;
 
 /** Macro for easy use  */
 #define LOG(level) Logging().Get(level)

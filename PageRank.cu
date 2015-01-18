@@ -34,7 +34,7 @@
 #include "olive.h"
 
 #define DAMPING 0.85
-#define EPSILON 0.0000001
+#define EPSILON 0.000002
 
 struct PR_Vertex {
     float rank;
@@ -54,8 +54,13 @@ struct PR_edge_F {
 };
 
 struct PR_vertex_F {
+    __device__ bool cond(PR_Vertex v) {
+        // printf("%d", fabs(v.delta) > EPSILON);
+        return (fabs(v.delta) > EPSILON);
+    }
+
     __device__
-    inline void operator() (PR_Vertex &v, float accum) {
+    inline void update(PR_Vertex &v, float accum) {
         // printf("accum: %f\n", accum);
         float rank_new = (1-DAMPING) + DAMPING * accum;
         v.delta = rank_new - v.rank;
@@ -69,16 +74,23 @@ struct PR_init_F {
     PR_init_F(float r): _rank(r) {}
 
     __device__
-    inline void operator() (PR_Vertex &v, float accum) {
+    inline void update(PR_Vertex &v, float accum) {
         v.rank = _rank;
+        v.delta = _rank;
+    }
+
+    __device__ bool cond(PR_Vertex v) {
+        return true;
     }
 };
 
 static float *ranks_g;
+static float *deltas_g;
 
 struct PR_at_F {
     inline void operator() (VertexId id, PR_Vertex v) {
         ranks_g[id] = v.rank;
+        deltas_g[id] = v.delta;
     }
 };
 
@@ -90,31 +102,29 @@ int main(int argc, char **argv) {
     int rounds = cl.getOptionIntValue("-rounds", 10);
 
     Olive<PR_Vertex, float> olive;
-    olive.init(inFile, 2);
-    VertexId n = olive.getVertexCount();
+    olive.readGraph(inFile, 2);
 
     // The final result, which will be aggregated.
-    ranks_g = new float[n];
+    ranks_g = new float[olive.getVertexCount()];
+    deltas_g = new float[olive.getVertexCount()];
 
-    // Initialize the vertex rank value to 1/n
-    olive.vertexMap<PR_init_F>(PR_init_F(1.0 / n));
+    // Initialize all vertices rank value to 1/n, and activate them
+    olive.vertexFilterDense<PR_init_F>(PR_init_F(1.0 /  olive.getVertexCount()));
     olive.vertexTransform<PR_at_F>(PR_at_F());
     for (int i = 0; i < olive.getVertexCount(); i++) {
-        printf("%f ", ranks_g[i]);
+        printf("%f %f\n", ranks_g[i], deltas_g[i]);
     }
 
-    int iterations = 0;
-    while (iterations <= rounds) {
-        printf("\n\n\niterations: %d worksize: %d\n",
-               iterations++,
-               olive.getWorksetSize());
-        
-        olive.edgeMap<PR_edge_F>(PR_edge_F());
-        olive.vertexMap<PR_vertex_F>(PR_vertex_F());
+    int i = 0;
+    while (!olive.allVerticesInactive() && i <= rounds) {
+        printf("\n\n\niterations %d\n", i++);
+
+        olive.edgeMapDense<PR_edge_F>(PR_edge_F());
+        olive.vertexFilterDense<PR_vertex_F>(PR_vertex_F());
 
         olive.vertexTransform<PR_at_F>(PR_at_F());
         for (int i = 0; i < olive.getVertexCount(); i++) {
-            printf("%f ", ranks_g[i]);
+        printf("%f %f\n", ranks_g[i], deltas_g[i]);
         }
     }
 

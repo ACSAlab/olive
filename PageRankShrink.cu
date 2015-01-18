@@ -89,20 +89,18 @@ struct PR_at_F {
 
 int main(int argc, char **argv) {
 
-    if (argc < 2) {
-        printf("wrong argument");
-        return 1;
-    }
+    CommandLine cl(argc, argv, "<inFile> [-rounds 10]");
+    char * inFile = cl.getArgument(0);
+    int rounds = cl.getOptionIntValue("-rounds", 10);
 
     Olive<PR_Vertex, float> olive;
-    olive.init(argv[1], 2);
-    VertexId n = olive.getVertexCount();
+    olive.readGraph(inFile, 2);
 
     // The final result, which will be aggregated.
     ranks_g = new float[n];
 
     // Initialize the vertex rank value to 1/n
-    olive.vertexMap<PR_init_F>(PR_init_F(1.0 / n));
+    olive.vertexMap<PR_init_F>(PR_init_F(1.0 / olive.getVertexCount()));
     olive.vertexTransform<PR_at_F>(PR_at_F());
     for (int i = 0; i < olive.getVertexCount(); i++) {
         printf("%f ", ranks_g[i]);

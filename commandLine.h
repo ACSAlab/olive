@@ -53,13 +53,13 @@ public:
         abort();
     }
 
-    // get an argument
-    // i is indexed from the last argument = 0, second to last indexed 1, ..
+    // get an argument,  0-> argv[2], 1-> argv[3]
     char *getArgument(int i) {
-        if (i < 0 || i > argc - 1) badArgument();
+        if (argc < i + 2) badArgument();
         return argv[i+1];
     }
 
+    // Find an option in the comand line string
     bool getOption(std::string option) {
         for (int i = 1; i < argc; i++)
             if ((std::string) argv[i] == option) return true;

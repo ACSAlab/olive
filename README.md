@@ -1,6 +1,6 @@
 # Olive: A Lightweight Graph Processing Framework for Multi-GPUs
 
-![./LOGO.png]
+![](./LOGO.png)
 
 ## Input Format
 
@@ -25,38 +25,41 @@ For some applications, like BFS, a `-s` flag (followed by an integer to indicate
 
 ## Olive Abstraction
 
+According to Olive's abstraction, computation in a graph algorithm can be divided into two scopes: the edge scope and the vertex scope.  
 
-##edgeMap
+### Edge Scope
 
-**edgeMap** is used to compute and collect the information of the neighbors of a vertex. The collected value will be cached in the destination vertex (in **accumulator**) temporarily. The user can further use it in vertex phase. This procedure mainly exploits the edge-level parallelism in the graph.
+In the edge scope, an **edgeMap** function is used to compute and collect the information of the neighbors of a vertex. The collected value will be cached temporarily in the destination vertex (in *accumulator*). The user can further use it in vertex scope. This function mainly exploits the edge-level parallelism in the graph.
 
-**edgeMap** takes a struct `F` as input. The struct `F` contains a pair of functions `gather` and `reduce` (isomorphic to *map* and *reduce*). The `gather` function computes a value (a user defined type) for each directional edge in the graph. The `reduce` function takes the value and performs a logical sum operation on the *accumulator*. So the operator must be commutative and associative.
+**edgeMap** takes a user-defined struct *F* as input. The struct *F* contains a pair of functions *gather* and *reduce* (isomorphic to *map* and *reduce*). The *gather* function computes a value (a user defined type) for each directional edge in the graph. The *reduce*`* function takes the value and performs a logical sum operation on the *accumulator*. So the operator must be commutative and associative.
 
     struct F {
-        __device__ inline V gather(PR_Vertex srcValue, EdgeId outdegree) {
+        __device__ inline AccumValue gather(VertexValue srcValue, EdgeId outNeighbors) {
             // ...
         }
-        __device__ inline void reduce(float &accumulator, float accum) {
+        __device__ inline void reduce(AccumValue &accumulator, AccumValue accum) {
             //...
         } 
     };
 
-### vertexMap
+### Vertex Scope
 
-**vertexMap** performs computation based on the vertex state and the cached accumulator. It takes a struct `F` as input. The functor takes the accumulator as input updates the local vertex state.
+Two functions **vertexMap** and **vertexFilter** are defined within the vertex scope. They are used to perform vertex-wise computation and mainly exploit the vertex-level parallelism.
+
+**vertexMap** performs computation based on the vertex state and the former cached accumulator. It takes a functor *F* as input. The functor takes the accumulator as input updates the local vertex state.
     
-    struct PR_vertex_F {
-        __device__ inline void operator() (PR_Vertex &v, float accum) {
+    struct F {
+        __device__ inline void operator() (VertexValue &localVertex, AccumValue accum) {
             //...
         }
     }
 
 
-**vertexMap** has an alternative: **vertexFilter**. The only difference between them is that **vertexFilter** will filter out a subset of vertices. The filtered vertices can be further used in the edge phase.
+**vertexMap** has an variant: **vertexFilter**. The only difference between them is that **vertexFilter** filters out a subset of vertices in the graph. The filtered vertices can be further used in the edge phase.
 
-**vertexMap** and **vertexFilter** are used to perform vertex-wise computation and mainly exploit the vertex-level parallelism.
+Writing an graph application with Olive is just invoking these functions. The underlying runtime system deals with everything.
 
-Writing an graph application with Olive is just invoking the above three functions. The underlying runtime system deals with everything.
+
 
 ## Partition Strategy
 

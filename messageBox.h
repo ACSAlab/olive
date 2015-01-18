@@ -82,7 +82,7 @@ public:
      * Uses asynchronous memory copy to hide the memory latency with computation.
      * Assumes the peer-to-peer access is already enabled.
      *
-     * If receives from an empty messagebox, the length shall be 0.
+     * If receives from an empty messagebox, the length is 0.
      * @param other   The message box to copy.
      *
      * @stream stream The stream to perform this copy within.

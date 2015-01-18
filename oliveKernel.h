@@ -2,17 +2,17 @@
  * The MIT License (MIT)
  *
  * Copyright (c) 2015 Yichao Cheng
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -39,20 +39,23 @@
 
 template<typename VertexValue,
          typename AccumValue,
-         typename EdgeFunction>
+         typename F>
 __global__
 void edgeGatherDenseKernel(
-    PartitionId  thisPid,
+    PartitionId   thisPid,
+    VertexId      vertexCount,
     const EdgeId *vertices,
     const Vertex *edges,
+    VertexValue  *vertexValues,
+    AccumValue   *accumulators,
+    int          *workset,
     MessageBox< VertexMessage<AccumValue> > *outboxes,
-    VertexId vertexCount,
-    VertexValue *vertexValues,
-    AccumValue *accumulators,
-    EdgeFunction edgeFunc)
+    F f)
 {
     int tid = THREAD_INDEX;
     if (tid >= vertexCount) return;
+    // Mask off computation
+    if (workset[tid] == 0) return;
     VertexValue srcValue = vertexValues[tid];
     EdgeId first = vertices[tid];
     EdgeId last = vertices[tid + 1];
@@ -61,11 +64,11 @@ void edgeGatherDenseKernel(
     for (EdgeId edge = first; edge < last; edge ++) {
         PartitionId dstPid = edges[edge].partitionId;
         // Edge level parallelism, which is exploited by SIMD lanes
-        AccumValue accum = edgeFunc.gather(srcValue, outdegree);
+        AccumValue accum = f.gather(srcValue, outdegree);
 
         if (dstPid == thisPid) {  // In this partition
             VertexId dstId = edges[edge].localId;
-            edgeFunc.reduce(accumulators[dstId], accum);
+            f.reduce(accumulators[dstId], accum);
         } else {  // In remote partition
             VertexMessage<AccumValue> msg;
             msg.receiverId = edges[edge].localId;
@@ -83,7 +86,7 @@ void edgeGatherDenseKernel(
  */
 template<typename VertexValue,
          typename AccumValue,
-         typename EdgeFunction>
+         typename F>
 __global__
 void edgeGatherSparseKernel(
     PartitionId  thisPid,
@@ -94,7 +97,7 @@ void edgeGatherSparseKernel(
     int queueSize,
     VertexValue *vertexValues,
     AccumValue *accumulators,
-    EdgeFunction edgeFunc)
+    F f)
 {
     int tid = THREAD_INDEX;
     if (tid >= queueSize) return;
@@ -107,11 +110,11 @@ void edgeGatherSparseKernel(
     for (EdgeId edge = first; edge < last; edge ++) {
         PartitionId dstPid = edges[edge].partitionId;
         // Edge level parallelism, which is exploited by SIMD lanes
-        AccumValue accum = edgeFunc.gather(srcValue, outdegree);
+        AccumValue accum = f.gather(srcValue, outdegree);
 
         if (dstPid == thisPid) {  // In this partition
             VertexId dstId = edges[edge].localId;
-            edgeFunc.reduce(accumulators[dstId], accum);
+            f.reduce(accumulators[dstId], accum);
         } else {  // In remote partition
             VertexMessage<AccumValue> msg;
             msg.receiverId = edges[edge].localId;
@@ -128,68 +131,95 @@ void edgeGatherSparseKernel(
  * The edgeMap and edgeFilter reuse the same code piece and differentiate
  * by a template flag `VertexFiltered`.
  */
-template<typename AccumValue, typename EdgeFunction>
+template<typename AccumValue, typename F>
 __global__
 void edgeScatterKernel(
     const MessageBox< VertexMessage<AccumValue> > &inbox,
     AccumValue *accumulators,
-    EdgeFunction edgeFunc)
+    F f)
 {
     int tid = THREAD_INDEX;
     if (tid >= inbox.length) return;
     VertexId dstId = inbox.buffer[tid].receiverId;
     AccumValue accum = inbox.buffer[tid].value;
-    edgeFunc.reduce(accumulators[dstId], accum);
+    f.reduce(accumulators[dstId], accum);
 }
+
 
 /**
  * The vertex map kernel.
- *
- * @param f   A user-defined functor to update the vertex state.
  */
 template<typename VertexValue,
          typename AccumValue,
-         typename VertexFunction>
+         typename F>
 __global__
 void vertexMapKernel(
-    VertexValue *vertexValues,
     int verticeCount,
-    AccumValue *accumulators,    
-    VertexFunction f)
+    VertexValue *vertexValues,
+    AccumValue *accumulators,
+    F f)
 {
     int tid = THREAD_INDEX;
     if (tid >= verticeCount) return;
     f(vertexValues[tid], accumulators[tid]);
 }
 
+
 /**
- * The vertex filter kernel.
- *
- * @param id  The id of the vertex to filter out.
- * @param f   A user-defined functor to update the vertex state.
+ * The vertex map kernel.
+ * 
+ * The initial value of `allVerticesInactive` is true. All the active vertices
+ * write false to `allVerticesInactive`. When there is no vertex is active,
+ * the final value will be false.
  */
 template<typename VertexValue,
          typename AccumValue,
-         typename VertexFunction>
+         typename F>
 __global__
-void vertexFilterKernel(
+void vertexFilterDenseKernel(
+    int verticeCount,
+    int *workset,
+    VertexValue *vertexValues,
+    AccumValue *accumulators,
+    bool *allVerticesInactive,
+    F f)
+{
+    int tid = THREAD_INDEX;
+    if (tid >= verticeCount) return;
+
+    if (f.cond(vertexValues[tid])) {
+        f.update(vertexValues[tid], accumulators[tid]);
+        workset[tid] = 1;
+        *allVerticesInactive = false;
+    } else {
+        workset[tid] = 0;
+    }
+}
+
+
+/**
+ * The vertex filter kernel.
+ */
+template<typename VertexValue,
+         typename AccumValue,
+         typename F>
+__global__
+void vertexFilterSparseKernel(
     int *workset,
     int vertexCount,
     VertexId *workqueue,
     VertexId *workqueueSize,
     VertexValue *vertexValues,
     AccumValue *accumulators,
-    VertexFunction f)
+    F f)
 {
     int tid = THREAD_INDEX;
     if (tid >= vertexCount) return;
 
-    f.update(vertexValues[tid], accumulators[tid]);
-
-    if (f.cond(vertexValues[tid]) == true) {
-        VertexId offset = atomicAdd(reinterpret_cast<unsigned long long *>
-                                   (workqueueSize), 1);
-        workqueue[offset] = tid;
+    if (f.cond(vertexValues[tid])) {
+        f.update(vertexValues[tid], accumulators[tid]);
+        VertexId pos = atomicAdd(workqueueSize, 1);
+        workqueue[pos] = tid;
     }
 }
 
