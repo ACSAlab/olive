@@ -37,50 +37,6 @@
 #include "common.h"
 
 
-template<typename VertexValue,
-         typename AccumValue,
-         typename F>
-__global__
-void edgeGatherDenseKernel(
-    PartitionId   thisPid,
-    VertexId      vertexCount,
-    const EdgeId *vertices,
-    const Vertex *edges,
-    VertexValue  *vertexValues,
-    AccumValue   *accumulators,
-    int          *workset,
-    MessageBox< VertexMessage<AccumValue> > *outboxes,
-    F f)
-{
-    int tid = THREAD_INDEX;
-    if (tid >= vertexCount) return;
-    // Mask off computation
-    if (workset[tid] == 0) return;
-    VertexValue srcValue = vertexValues[tid];
-    EdgeId first = vertices[tid];
-    EdgeId last = vertices[tid + 1];
-    EdgeId outdegree = last - first + 1;
-
-    for (EdgeId edge = first; edge < last; edge ++) {
-        PartitionId dstPid = edges[edge].partitionId;
-        // Edge level parallelism, which is exploited by SIMD lanes
-        AccumValue accum = f.gather(srcValue, outdegree);
-
-        if (dstPid == thisPid) {  // In this partition
-            VertexId dstId = edges[edge].localId;
-            f.reduce(accumulators[dstId], accum);
-        } else {  // In remote partition
-            VertexMessage<AccumValue> msg;
-            msg.receiverId = edges[edge].localId;
-            msg.value      = accum;
-            size_t offset = atomicAdd(reinterpret_cast<unsigned long long *>
-                                      (&outboxes[dstPid].length), 1);
-            outboxes[dstPid].buffer[offset] = msg;
-        }
-    }
-}
-
-
 /**
  * The CUDA kernel for expanding vertices in the work queue.
  */
@@ -88,19 +44,20 @@ template<typename VertexValue,
          typename AccumValue,
          typename F>
 __global__
-void edgeGatherSparseKernel(
-    PartitionId  thisPid,
-    const EdgeId *vertices,
-    const Vertex *edges,
-    MessageBox< VertexMessage<AccumValue> > *outboxes,
+void edgeGatherKernel(
+    PartitionId     thisPid,
     const VertexId *workqueue,
-    int queueSize,
-    VertexValue *vertexValues,
-    AccumValue *accumulators,
+    const VertexId *workqueueSize,
+    const EdgeId   *vertices,
+    const Vertex   *edges,
+    VertexValue    *vertexValues,
+    AccumValue     *accumulators,
+    int            *activties,
+    MessageBox< VertexMessage<AccumValue> > *outboxes,
     F f)
 {
     int tid = THREAD_INDEX;
-    if (tid >= queueSize) return;
+    if (tid >= *workqueueSize) return;
     VertexId srcId = workqueue[tid];
     VertexValue srcValue = vertexValues[srcId];
     EdgeId first = vertices[srcId];
@@ -115,6 +72,7 @@ void edgeGatherSparseKernel(
         if (dstPid == thisPid) {  // In this partition
             VertexId dstId = edges[edge].localId;
             f.reduce(accumulators[dstId], accum);
+            activties[dstId] = 1;
         } else {  // In remote partition
             VertexMessage<AccumValue> msg;
             msg.receiverId = edges[edge].localId;
@@ -128,14 +86,15 @@ void edgeGatherSparseKernel(
 
 /**
  * The CUDA kernel for scattering messages to local vertex values.
- * The edgeMap and edgeFilter reuse the same code piece and differentiate
- * by a template flag `VertexFiltered`.
+ * If a node receive any message from other partition, the vertex will be
+ * marked as active.
  */
 template<typename AccumValue, typename F>
 __global__
 void edgeScatterKernel(
     const MessageBox< VertexMessage<AccumValue> > &inbox,
     AccumValue *accumulators,
+    int *activties,
     F f)
 {
     int tid = THREAD_INDEX;
@@ -143,31 +102,13 @@ void edgeScatterKernel(
     VertexId dstId = inbox.buffer[tid].receiverId;
     AccumValue accum = inbox.buffer[tid].value;
     f.reduce(accumulators[dstId], accum);
+    activties[dstId] = 1;
 }
 
 
 /**
  * The vertex map kernel.
- */
-template<typename VertexValue,
-         typename AccumValue,
-         typename F>
-__global__
-void vertexMapKernel(
-    int verticeCount,
-    VertexValue *vertexValues,
-    AccumValue *accumulators,
-    F f)
-{
-    int tid = THREAD_INDEX;
-    if (tid >= verticeCount) return;
-    f(vertexValues[tid], accumulators[tid]);
-}
-
-
-/**
- * The vertex map kernel.
- * 
+ *
  * The initial value of `allVerticesInactive` is true. All the active vertices
  * write false to `allVerticesInactive`. When there is no vertex is active,
  * the final value will be false.
@@ -176,48 +117,51 @@ template<typename VertexValue,
          typename AccumValue,
          typename F>
 __global__
-void vertexFilterDenseKernel(
-    int verticeCount,
-    int *workset,
+void vertexMapKernel(
+    int         *activties,
+    int          verticeCount,
     VertexValue *vertexValues,
-    AccumValue *accumulators,
-    bool *allVerticesInactive,
+    AccumValue  *accumulators,
+    VertexId    *workqueue,
+    VertexId    *workqueueSize,
     F f)
 {
     int tid = THREAD_INDEX;
     if (tid >= verticeCount) return;
 
+    if (activties[tid] == 0) return;
+
+    // Deactivate anyway, since we only want the vertex with changed
+    // accumulator to be activated in the vertex phase.
+    activties[tid] = 0;  
+
     if (f.cond(vertexValues[tid])) {
         f.update(vertexValues[tid], accumulators[tid]);
-        workset[tid] = 1;
-        *allVerticesInactive = false;
-    } else {
-        workset[tid] = 0;
+
+        // if the local state is modified,  activate it
+        activties[tid] = 1;        
+        VertexId pos = atomicAdd(workqueueSize, 1);
+        workqueue[pos] = tid;
     }
 }
 
-
-/**
- * The vertex filter kernel.
- */
 template<typename VertexValue,
          typename AccumValue,
          typename F>
 __global__
-void vertexFilterSparseKernel(
-    int *workset,
-    int vertexCount,
-    VertexId *workqueue,
-    VertexId *workqueueSize,
+void vertexFilterKernel(
+    int         *activties,
+    int          verticeCount,
     VertexValue *vertexValues,
-    AccumValue *accumulators,
+    VertexId    *workqueue,
+    VertexId    *workqueueSize,
     F f)
 {
     int tid = THREAD_INDEX;
-    if (tid >= vertexCount) return;
-
+    if (tid >= verticeCount) return;
     if (f.cond(vertexValues[tid])) {
-        f.update(vertexValues[tid], accumulators[tid]);
+        f.update(vertexValues[tid]);
+        activties[tid] = 1;
         VertexId pos = atomicAdd(workqueueSize, 1);
         workqueue[pos] = tid;
     }

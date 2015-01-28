@@ -59,7 +59,7 @@ public:
      *
      */
     template<typename F>
-    void edgeMapDense(F f) {
+    void edgeMap(F f) {
         double startTime = getTimeMillis();
 
         //////////////////////////// Computation stage /////////////////////////
@@ -75,14 +75,23 @@ public:
                 if (rmtPid == i) continue;
                 partitions[i].outboxes[rmtPid].clear();
             }
-            auto config = util::kernelConfig(partitions[i].vertexCount);
+            // Transfer the queue size back
             CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
+            CUDA_CHECK(D2H(partitions[i].workqueueSize,
+                           partitions[i].workqueueSizeDevice,
+                           sizeof(VertexId)));
+
+            LOG(DEBUG) << "Partition " << partitions[i].partitionId
+                       << " work queue size=" << *partitions[i].workqueueSize;
+
+            auto config = util::kernelConfig(*partitions[i].workqueueSize);
             CUDA_CHECK(cudaEventRecord(partitions[i].startEvents[0], partitions[i].streams[1]));
             {
-                edgeGatherDenseKernel<VertexValue, AccumValue, F>
+                edgeGatherKernel<VertexValue, AccumValue, F>
                 <<< config.first, config.second, 0, partitions[i].streams[1]>>>(
                     partitions[i].partitionId,
-                    partitions[i].vertexCount,
+                    partitions[i].workqueue.elemsDevice,
+                    partitions[i].workqueueSizeDevice,
                     partitions[i].vertices.elemsDevice,
                     partitions[i].edges.elemsDevice,
                     partitions[i].vertexValues.elemsDevice,
@@ -152,9 +161,10 @@ public:
                 CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
                 {
                     edgeScatterKernel<AccumValue, F>
-                    <<< config.first, config.second, 0, partitions[i].streams[1] >>> (
+                    <<< config.first, config.second, 0, partitions[i].streams[1] >>>(
                         partitions[i].inboxes[rmtPid],
                         partitions[i].accumulators.elemsDevice,
+                        partitions[i].workset.elemsDevice,
                         f);
                 }
                 LOG(DEBUG) << "Partition" << partitions[i].partitionId
@@ -176,7 +186,16 @@ public:
 
         // Profiling the time
         totalTime = getTimeMillis() - startTime;
-        LOG(INFO) << "vertexMapScatter=" << std::setprecision(2) << totalTime << "ms";
+        LOG(INFO) << "edgeMapScatter=" << std::setprecision(2) << totalTime << "ms";
+
+
+        // Peek the activated vertices in vertex phase
+        for (int i = 0; i < partitions.size(); i++) {
+            partitions[i].workset.persist();
+            for (int j = 0; j < partitions[i].workset.length; j++) {
+                printf("%d: %d\n", partitions[i].globalIds[j], partitions[i].workset[j]);
+            }
+        }
     }
 
     /**
@@ -186,42 +205,42 @@ public:
      *           original vertex value as parameter and returns a new
      *           vertex value.
      */
-    template<typename F>
-    void vertexMap(F f) {
-        double startTime = getTimeMillis();
-        // Synchronize all partitions
-        for (auto &par : partitions) {
-            assert(par.vertexCount > 0);
-            auto config = util::kernelConfig(par.vertexCount);
-            CUDA_CHECK(cudaSetDevice(par.deviceId));
-            CUDA_CHECK(cudaEventRecord(par.startEvents[0], par.streams[1]));
-            {
-                vertexMapKernel<VertexValue, AccumValue, F>
-                <<< config.first, config.second, 0, par.streams[1]>>>(
-                    par.vertexCount,
-                    par.vertexValues.elemsDevice,
-                    par.accumulators.elemsDevice,
-                    f);
-            }
-            CUDA_CHECK(cudaEventRecord(par.endEvents[0], par.streams[1]));
-        }
-        // Synchronize all partitions
-        for (auto &par : partitions) {
-            CUDA_CHECK(cudaStreamSynchronize(par.streams[1]));
-        }
-        // Profiling the time
-        double totalTime = getTimeMillis() - startTime;
-        for (auto &par : partitions) {
-            float time;
-            CUDA_CHECK(cudaSetDevice(par.deviceId));
-            CUDA_CHECK(cudaEventElapsedTime(&time, par.startEvents[0],
-                                            par.endEvents[0]));
-            LOG(DEBUG) << "Partition" << par.partitionId << " vertexMap: "
-                       << " vertex count=" << par.vertexCount
-                       << " time="  << std::setprecision(2) << time << "ms";
-        }
-        LOG(INFO) << "vertexMap=" << std::setprecision(2) << totalTime << "ms";
-    }
+    // template<typename F>
+    // void vertexMap(F f) {
+    //     double startTime = getTimeMillis();
+    //     // Synchronize all partitions
+    //     for (auto &par : partitions) {
+    //         assert(par.vertexCount > 0);
+    //         auto config = util::kernelConfig(par.vertexCount);
+    //         CUDA_CHECK(cudaSetDevice(par.deviceId));
+    //         CUDA_CHECK(cudaEventRecord(par.startEvents[0], par.streams[1]));
+    //         {
+    //             vertexMapKernel<VertexValue, AccumValue, F>
+    //             <<< config.first, config.second, 0, par.streams[1]>>>(
+    //                 par.vertexCount,
+    //                 par.vertexValues.elemsDevice,
+    //                 par.accumulators.elemsDevice,
+    //                 f);
+    //         }
+    //         CUDA_CHECK(cudaEventRecord(par.endEvents[0], par.streams[1]));
+    //     }
+    //     // Synchronize all partitions
+    //     for (auto &par : partitions) {
+    //         CUDA_CHECK(cudaStreamSynchronize(par.streams[1]));
+    //     }
+    //     // Profiling the time
+    //     double totalTime = getTimeMillis() - startTime;
+    //     for (auto &par : partitions) {
+    //         float time;
+    //         CUDA_CHECK(cudaSetDevice(par.deviceId));
+    //         CUDA_CHECK(cudaEventElapsedTime(&time, par.startEvents[0],
+    //                                         par.endEvents[0]));
+    //         LOG(DEBUG) << "Partition" << par.partitionId << " vertexMap: "
+    //                    << " vertex count=" << par.vertexCount
+    //                    << " time="  << std::setprecision(2) << time << "ms";
+    //     }
+    //     LOG(INFO) << "vertexMap=" << std::setprecision(2) << totalTime << "ms";
+    // }
 
     /**
      * Filters one vertex by specifying a vertex id and applies a user-defined
@@ -237,31 +256,93 @@ public:
      *                vertex value.
      */
     template<typename F>
-    void vertexFilterDense(F f) {
+    void vertexMap(F f) {
         double startTime = getTimeMillis();
         for (int i = 0; i < partitions.size(); i++) {
             assert(partitions[i].vertexCount > 0);
-            // Set up the activeness of all vertices before launching kernel
-            *partitions[i].allVerticesInactive = true;
-            CUDA_CHECK(H2D(partitions[i].allVerticesInactiveDevice,
-                           partitions[i].allVerticesInactive, sizeof(bool)));
-            auto config = util::kernelConfig(partitions[i].vertexCount);
+            // Clear the workqueue before generating it
             CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
+            *partitions[i].workqueueSize = 0;
+            CUDA_CHECK(H2D(partitions[i].workqueueSizeDevice,
+                           partitions[i].workqueueSize, sizeof(VertexId)));
+
+            auto config = util::kernelConfig(partitions[i].vertexCount);
             CUDA_CHECK(cudaEventRecord(partitions[i].startEvents[0], partitions[i].streams[1]));
             {
-                vertexFilterDenseKernel<VertexValue, AccumValue, F>
+                vertexMapKernel<VertexValue, AccumValue, F>
                 <<< config.first, config.second, 0, partitions[i].streams[1]>>>(
-                    partitions[i].vertexCount,
                     partitions[i].workset.elemsDevice,
+                    partitions[i].vertexCount,
                     partitions[i].vertexValues.elemsDevice,
                     partitions[i].accumulators.elemsDevice,
-                    partitions[i].allVerticesInactiveDevice,
+                    partitions[i].workqueue.elemsDevice,
+                    partitions[i].workqueueSizeDevice,
                     f);
             }
             CUDA_CHECK(cudaEventRecord(partitions[i].endEvents[0], partitions[i].streams[1]));
         }
         // Synchronize all partitions
         for (int i = 0; i < partitions.size(); i++) {
+            CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
+            CUDA_CHECK(cudaStreamSynchronize(partitions[i].streams[1]));
+        }
+        // Profiling the time
+        double totalTime = getTimeMillis() - startTime;
+        for (int i = 0; i < partitions.size(); i++) {
+            float time;
+            CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
+            CUDA_CHECK(cudaEventElapsedTime(&time, partitions[i].startEvents[0],
+                                            partitions[i].endEvents[0]));
+            LOG(DEBUG) << "Partition" << partitions[i].partitionId << " vertexMap: "
+                       << " vertex count=" << partitions[i].vertexCount
+                       << " time="  << std::setprecision(2) << time << "ms";
+        }
+        LOG(INFO) << "vertexMap=" << std::setprecision(2) << totalTime << "ms";
+
+        // Peek the activated vertices in edge phase
+        for (int i = 0; i < partitions.size(); i++) {
+            partitions[i].workqueue.persist();
+            CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
+            CUDA_CHECK(D2H(partitions[i].workqueueSize,
+                           partitions[i].workqueueSizeDevice,
+                           sizeof(VertexId)));
+            for (int j = 0; j < *partitions[i].workqueueSize; j++) {
+                printf("%d ", partitions[i].workqueue[j]);
+            }
+            printf("\n");
+        }
+
+    }
+
+
+    template<typename F>
+    void vertexFilter(F f) {
+        double startTime = getTimeMillis();
+        for (int i = 0; i < partitions.size(); i++) {
+            assert(partitions[i].vertexCount > 0);
+            // Clear the workqueue before generating it
+            CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
+            *partitions[i].workqueueSize = 0;
+            CUDA_CHECK(H2D(partitions[i].workqueueSizeDevice,
+                           partitions[i].workqueueSize, sizeof(VertexId)));
+
+            auto config = util::kernelConfig(partitions[i].vertexCount);
+            CUDA_CHECK(cudaEventRecord(partitions[i].startEvents[0], partitions[i].streams[1]));
+            {
+                vertexFilterKernel<VertexValue, AccumValue, F>
+                <<< config.first, config.second, 0, partitions[i].streams[1]>>>(
+                    partitions[i].workset.elemsDevice,
+                    partitions[i].vertexCount,
+                    partitions[i].vertexValues.elemsDevice,
+                    partitions[i].workqueue.elemsDevice,
+                    partitions[i].workqueueSizeDevice,
+                    f);
+            }
+            CUDA_CHECK(cudaEventRecord(partitions[i].endEvents[0], partitions[i].streams[1]));
+        }
+        // Synchronize all partitions
+        for (int i = 0; i < partitions.size(); i++) {
+            CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
             CUDA_CHECK(cudaStreamSynchronize(partitions[i].streams[1]));
         }
         // Profiling the time
@@ -275,34 +356,22 @@ public:
                        << " vertex count=" << partitions[i].vertexCount
                        << " time="  << std::setprecision(2) << time << "ms";
         }
-        LOG(INFO) << "vertexFilterDense=" << std::setprecision(2) << totalTime << "ms";
-
-
-        for (int i = 0; i < partitions.size(); i++) {
-            CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
-            CUDA_CHECK(D2H(partitions[i].allVerticesInactive,
-                           partitions[i].allVerticesInactiveDevice,
-                           sizeof(bool)));
-            LOG(DEBUG) << "Partition" << partitions[i].partitionId << " allVerticesInactive: "
-                       << *partitions[i].allVerticesInactive;
-
-        }
-
-
+        LOG(INFO) << "vertexFilter=" << std::setprecision(2) << totalTime << "ms";
     }
+
 
     /**
      * Transfer all the `workqueueSize` back and sum them up.
      */
     inline VertexId getWorkqueueSize() {
-        VertexId size;
+        VertexId size = 0;
         for (int i = 0; i < partitions.size(); i++) {
             CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
             CUDA_CHECK(D2H(partitions[i].workqueueSize,
                            partitions[i].workqueueSizeDevice,
                            sizeof(VertexId)));
-            LOG(DEBUG) << "Partition " << partitions[i].partitionId
-                       << " work queue size=" << *partitions[i].workqueueSize;
+            // LOG(DEBUG) << "Partition " << partitions[i].partitionId
+            //            << " work queue size=" << *partitions[i].workqueueSize;
             size += *partitions[i].workqueueSize;
         }
         return size;
@@ -349,8 +418,10 @@ public:
     void vertexTransform(F f) {
         for (int i = 0; i < partitions.size(); i++) {
             partitions[i].vertexValues.persist();
+
             for (VertexId j = 0; j < partitions[i].vertexValues.size(); j++) {
-                f(partitions[i].globalIds[j], partitions[i].vertexValues[j]);
+                f(partitions[i].globalIds[j],
+                  partitions[i].vertexValues[j]);
             }
         }
     }

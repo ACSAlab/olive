@@ -55,7 +55,9 @@ namespace util {
  */
 std::pair<int, int> kernelConfig(int threads,
                                  int threadsPerBlock = DEFAULT_THREADS_PER_BLOCK) {
-    assert(threads > 0);
+    if (threads == 0) {
+        return std::make_pair(0, 0);
+    } 
     assert(threads <= MAX_THREADS);
     if (threads < threadsPerBlock) threadsPerBlock = threads;
     int blocks =  threads % threadsPerBlock == 0 ?

@@ -55,13 +55,11 @@ struct PR_edge_F {
 
 struct PR_vertex_F {
     __device__ bool cond(PR_Vertex v) {
-        // printf("%d", fabs(v.delta) > EPSILON);
         return (fabs(v.delta) > EPSILON);
     }
 
     __device__
     inline void update(PR_Vertex &v, float accum) {
-        // printf("accum: %f\n", accum);
         float rank_new = (1-DAMPING) + DAMPING * accum;
         v.delta = rank_new - v.rank;
         v.rank = rank_new;
@@ -74,7 +72,7 @@ struct PR_init_F {
     PR_init_F(float r): _rank(r) {}
 
     __device__
-    inline void update(PR_Vertex &v, float accum) {
+    inline void update(PR_Vertex &v) {
         v.rank = _rank;
         v.delta = _rank;
     }
@@ -87,6 +85,8 @@ struct PR_init_F {
 static float *ranks_g;
 static float *deltas_g;
 
+
+
 struct PR_at_F {
     inline void operator() (VertexId id, PR_Vertex v) {
         ranks_g[id] = v.rank;
@@ -97,9 +97,9 @@ struct PR_at_F {
 
 int main(int argc, char **argv) {
 
-    CommandLine cl(argc, argv, "<inFile> [-rounds 10]");
+    CommandLine cl(argc, argv, "<inFile> [-rounds 20]");
     char * inFile = cl.getArgument(0);
-    int rounds = cl.getOptionIntValue("-rounds", 10);
+    int rounds = cl.getOptionIntValue("-rounds", 20);
 
     Olive<PR_Vertex, float> olive;
     olive.readGraph(inFile, 2);
@@ -108,26 +108,22 @@ int main(int argc, char **argv) {
     ranks_g = new float[olive.getVertexCount()];
     deltas_g = new float[olive.getVertexCount()];
 
+
     // Initialize all vertices rank value to 1/n, and activate them
-    olive.vertexFilterDense<PR_init_F>(PR_init_F(1.0 /  olive.getVertexCount()));
-    olive.vertexTransform<PR_at_F>(PR_at_F());
-    for (int i = 0; i < olive.getVertexCount(); i++) {
-        printf("%f %f\n", ranks_g[i], deltas_g[i]);
-    }
+    olive.vertexFilter<PR_init_F>(PR_init_F(1.0 /  olive.getVertexCount()));
 
     int i = 0;
-    while (!olive.allVerticesInactive() && i <= rounds) {
+    while (olive.getWorkqueueSize() > 0) {
+        if (i > rounds) break;
         printf("\n\n\niterations %d\n", i++);
-
-        olive.edgeMapDense<PR_edge_F>(PR_edge_F());
-        olive.vertexFilterDense<PR_vertex_F>(PR_vertex_F());
-
-        olive.vertexTransform<PR_at_F>(PR_at_F());
-        for (int i = 0; i < olive.getVertexCount(); i++) {
-        printf("%f %f\n", ranks_g[i], deltas_g[i]);
-        }
+        olive.edgeMap<PR_edge_F>(PR_edge_F());
+        olive.vertexMap<PR_vertex_F>(PR_vertex_F());
     }
 
+    olive.vertexTransform<PR_at_F>(PR_at_F());
+    for (int i = 0; i < olive.getVertexCount(); i++) {
+        printf("%d %f %f\n", i, ranks_g[i], deltas_g[i]);
+    }
 
     return 0;
 }
