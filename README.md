@@ -46,17 +46,8 @@ In the edge scope, an **edgeMap** function is used to compute and collect the in
 
 Two functions **vertexMap** and **vertexFilter** are defined within the vertex scope. They are used to perform vertex-wise computation and mainly exploit the vertex-level parallelism.
 
-**vertexMap** performs computation based on the vertex state and the formerly cached accumulator. It takes a functor *F* as input. The functor takes the accumulator as input and updates the local vertex state.
+**vertexMap** performs computation based on the vertex state and the formerly cached accumulator. It takes as input a *cond* function and a *update* function. The *cond* function takes the vertex local state as input and return a boolean value. The *update* function updates the local vertex state if and only of the *cond* function returns *true*.
     
-    struct F {
-        __device__ inline void operator() (VertexValue &localVertex, AccumValue accum) {
-            //...
-        }
-    }
-
-
-**vertexFilter** is the variant of *vertexMap*. The only difference between them is that **vertexFilter** filters out a subset of vertices in the graph. The filtered vertices are activated and can be further used in the edge phase. 
-
     struct F {
         __device__ inline bool cond(VertexValue localVertex) {
             //...
@@ -66,7 +57,16 @@ Two functions **vertexMap** and **vertexFilter** are defined within the vertex s
         }
     }
 
+**vertexFilter** is an variant of **vertexMap**. It filters out the active vertices in the graph. The activated vertices can be further used in the edge phase. 
+
 Writing an graph application with Olive is just invoking these functions. The underlying runtime system deals with everything.
+
+We note that both **edgeMap** and **vertexMap** functions operate on the active vertices in the graph. A vertex can be activated in two ways: 
+
+1. Filtered-out by calling **vertexFilter** function.
+2. Any other vertex deliveries information to it (usually happens in the **edgeMap** phase).
+
+And any vertex can be deactivated in the **vertexMap** phase as long as the **cond** function is not satisfied.
 
 
 ## Partition Strategy
