@@ -58,7 +58,7 @@ CUDA_LIB_DIR = "$(shell dirname $(NVCC))/../lib64"
 #-------------------------------------------------------------------------------
 OLIVE = $(wildcard *.h)
 
-ALL = PageRank
+ALL = PageRank unitest_flexible
 
 all: $(ALL)
 

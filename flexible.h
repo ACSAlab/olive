@@ -2,17 +2,17 @@
  * The MIT License (MIT)
  *
  * Copyright (c) 2015 Yichao Cheng
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -61,19 +61,24 @@ public:
     VertexId dstId;     /** The vertex id of the target vertex */
     EdgeValue value;     /** The value associated with the edge */
 
-    /** Constructor with all three parameters */
     explicit EdgeTuple(VertexId src, VertexId dst, EdgeValue v) {
         srcId = src;
         dstId = dst;
         value  = v;
     }
+
+    /** For sorting the edge tuples */
+    friend bool operator< (EdgeTuple a, EdgeTuple b) {
+        return a.srcId < b.srcId;
+    }
+
 };
 
 /**
  * Directed edge structure for flexible graph representation.
  * Each edge contains an vertex id for either its destination or its source,
  * and its associated edge value.
- * 
+ *
  * @tparam EdgeValue the edge value type
  */
 template<typename EdgeValue>
@@ -82,7 +87,6 @@ public:
     VertexId vertexId;
     EdgeValue value;
 
-    /** Constructor */
     explicit Edge(VertexId id, EdgeValue v): vertexId(id), value(v) {}
 
     /** For sorting the outgoing edges of a certain vertex */
@@ -163,10 +167,10 @@ public:
     /**
      * Some vertices are missing from a partitioned subgraph. Records the
      * partition id and the local id for those missing vertices.
-     * 
+     *
      * The ghost vertices are stored as key-value pairs, where the key is the
      * global id and the value is a (partitionId, localId) pair.
-     * 
+     *
      * It can be used to establish a routing table which ships a ghost vertex
      * to its remote partition.
      *
@@ -177,6 +181,14 @@ public:
      * with the `partitionId`.
      */
     std::map< VertexId, std::pair<PartitionId, VertexId> > ghostVertices;
+
+    /**
+     * The following structure is used to reduce the complexity of appending
+     * edges from O(E*V) to O(E).
+     * key: the id of the vertex.
+     * value:  the offset of the newly appended vertex in `vertices`.
+     */
+    std::map< VertexId, size_t > appearedVertices;
 
     /** Unique id of a subgraph. */
     PartitionId partitionId;
@@ -224,41 +236,41 @@ public:
         return (it == ghostVertices.end());
     }
 
-    /**
-     * Turning edge tuple representation to flex's edge representation.
-     *
-     * @note When a graph is built with this method, the vertex value
-     * is ignored (simply set as 0).
-     *
-     */
-    void addEdgeTuple(EdgeTuple<EdgeValue> edgeTuple) {
-        Edge<EdgeValue> outEdge(edgeTuple.dstId, edgeTuple.value);
-        Edge<EdgeValue> inEdge(edgeTuple.srcId, edgeTuple.value);
-        bool srcExists = false;
-        bool dstExists = false;
-        // If the target node already exists, append the edge directly.
-        for (auto &v : vertices) {
-            if (srcExists && dstExists) break;
-            if (v.id == edgeTuple.srcId) {
-                v.outEdges.push_back(outEdge);
-                srcExists = true;
-            }
-            if (v.id == edgeTuple.dstId) {
-                v.inEdges.push_back(inEdge);
-                dstExists = true;
-            }
-        }
-        if (!srcExists) {
-            Vertex<int, EdgeValue> newNode(edgeTuple.srcId, 0);
-            newNode.outEdges.push_back(outEdge);
-            vertices.push_back(newNode);
-        }
-        if (!dstExists) {
-            Vertex<int, EdgeValue> newNode(edgeTuple.dstId, 0);
-            newNode.inEdges.push_back(inEdge);
-            vertices.push_back(newNode);
-        }
-    }
+    // /**
+    //  * Turning edge tuple representation to flex's edge representation.
+    //  *
+    //  * @note When a graph is built with this method, the vertex value
+    //  * is ignored (simply set as 0).
+    //  *
+    //  */
+    // void addEdgeTuple(EdgeTuple<EdgeValue> edgeTuple) {
+    //     VertexId dstId = edgeTuple.dstId;
+    //     VertexId srcId = edgeTuple.srcId;
+    //     Edge<EdgeValue> outEdge(dstId, edgeTuple.value);
+    //     Edge<EdgeValue> inEdge(srcId, edgeTuple.value);
+
+    //     auto it = appearedVertices.find(dstId);
+    //     if (it == appearedVertices.end()) {
+    //         Vertex<int, EdgeValue> newNode(dstId, 0);
+    //         newNode.inEdges.push_back(inEdge);
+    //         vertices.push_back(newNode);
+    //         appearedVertices[dstId] = vertices.size() - 1;
+    //     } else {
+    //         assert(it->second < vertices.size());
+    //         vertices[it->second].inEdges.push_back(inEdge);
+    //     }
+
+    //     it = appearedVertices.find(srcId);
+    //     if (it == appearedVertices.end()) {
+    //         Vertex<int, EdgeValue> newNode(srcId, 0);
+    //         newNode.outEdges.push_back(outEdge);
+    //         vertices.push_back(newNode);
+    //         appearedVertices[srcId] = vertices.size() - 1;
+    //     } else {
+    //         assert(it->second < vertices.size());
+    //         vertices[it->second].outEdges.push_back(outEdge);
+    //     }
+    // }
 
     /**
      * Prints the out-degree distribution in log-style on the screen.
@@ -320,43 +332,81 @@ public:
      * @param path The path to the graph
      */
     void fromEdgeListFile(const char *path) {
-        FILE *fileHandler = fopen(path, "r");
-        if (fileHandler == NULL) {
+        FILE *file = fopen(path, "r");
+        if (file == NULL) {
             LOG(ERROR) << "Can not open graph file: " << path;
             return;
         }
-        char line[1024];                // Stores the line read in
-        char temp[1024];                // Shadows the line in a temp buffer
-        char *token;                    // Points to the parsed token
-        char *remaining;                // Points to the remaining line
-        double startTime = getTimeMillis();
 
-        while (fgets(line, 1024, fileHandler) != NULL) {
-            if (line[0] != '\0' && line[0] != '#') {
-                std::vector<char *> tokens;
-                line[strlen(line) - 1] = '\0';  // Remove the ending '\n'
-                strncpy(temp, line, 1024);
-                remaining = temp;
-                while ((token = strsep(&remaining, " \t")) != NULL) {
-                    tokens.push_back(token);
+        char c;
+        long long llsrc, lldst;
+        std::vector< EdgeTuple<int> > parsedEdgeTuples;
+        Stopwatch stopwatch;
+        stopwatch.start();
+
+        while ((c = fgetc(file)) != EOF) {
+            switch (c) {
+            case '#':
+                // comment: skip any char encountered until see a '\n'
+                while ((c = fgetc(file)) != EOF) {
+                    if (c == '\n') break;
                 }
-                if (tokens.size() < 2 || !util::isNumeric(tokens[0]) || 
-                    !util::isNumeric(tokens[1])) {
-                    LOG(WARNING) << "Invalid line: " << line;
-                    continue;
-                }
-                VertexId srcId = static_cast<VertexId>(atol(tokens[0]));
-                VertexId dstId = static_cast<VertexId>(atol(tokens[1]));
-                if (tokens.size() == 2) {
-                    addEdgeTuple(EdgeTuple<int>(srcId, dstId, 1));
-                } else {
-                    addEdgeTuple(EdgeTuple<int>(srcId, dstId, atoi(tokens[2])));
-                }
+                break;
+            case ' ':
+            case '\t':
+                break;
+            default:
+                ungetc(c, file); // put the char back
+                fscanf(file, "%lld %lld\n", &llsrc, &lldst);
+                parsedEdgeTuples.push_back(EdgeTuple<int>(llsrc, lldst, 1));
             }
         }
-        LOG(INFO) << "It took " << getTimeMillis() - startTime
-                  << "ms to load the edge list.";
+
+        LOG(INFO) << "It took " << stopwatch.getElapsedMillis()
+                  << "ms to parse " << parsedEdgeTuples.size() << " edges.";
+
+
+        // Accelerate the process by clustering the edge tuples by src Id
+        std::stable_sort(parsedEdgeTuples.begin(), parsedEdgeTuples.end());
+
+        // Go through the edge tuples for 2 passes and generate the out/in edge
+        // list for all vertices. That information will be used when landing
+        // the graph data.
+        VertexId prevSrc = VertexId(-1);
+        for (auto t : parsedEdgeTuples) {
+            Edge<EdgeValue> outEdge(t.dstId, t.value);
+            if (t.srcId != prevSrc) {
+                Vertex<int, EdgeValue> newNode(t.srcId, 0);
+                vertices.push_back(newNode);
+                prevSrc = t.srcId;
+                appearedVertices[t.srcId] = vertices.size() - 1;
+            }
+            vertices.back().outEdges.push_back(outEdge);
+        }
+
+        LOG(INFO) << "It took " << stopwatch.getElapsedMillis()
+                  << "ms to generate the out edge list.";
+
+
+        // Second Pass
+        for (auto t : parsedEdgeTuples) {
+            Edge<EdgeValue> inEdge(t.srcId, t.value);
+            auto it = appearedVertices.find(t.dstId);
+            if (it == appearedVertices.end()) {
+                Vertex<int, EdgeValue> newNode(t.dstId, 0);
+                vertices.push_back(newNode);
+                appearedVertices[t.dstId] = vertices.size() - 1;
+                vertices.back().inEdges.push_back(inEdge);
+            } else {
+                vertices[it->second].inEdges.push_back(inEdge);
+            }
+        }
+
+        LOG(INFO) << "It took " << stopwatch.getElapsedMillis()
+                  << "ms to generate the in edge list.";
+
     }
+
 
     /**
      * Partitioning a graph to subgraphs by a specified `partitionStrategy`.
