@@ -1,4 +1,29 @@
 /**
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2015 Yichao Cheng
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+
+/**
  * Utils.
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
@@ -9,7 +34,6 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include <sys/time.h>
 #include <utility>
 
 #include "cuda_runtime.h"
@@ -19,26 +43,29 @@
 namespace util {
 
 /**
- * Calculates the block number to launch a kernel by specifying 
+ * Calculates the block number to launch a kernel by specifying
  * the thread number to fulfill the job and per-block thread number.
  *
  * The block number is redundant and can not exceed the limits
  * which is defined by the architecture.
- * 
+ *
  * @param  threads         How many threads is requires
  * @param  threadsPerBlock How many threads in each block (256 by default)
  * @return                 A pair (block number, thread number per block)
  */
 std::pair<int, int> kernelConfig(int threads,
-    int threadsPerBlock = DEFAULT_THREADS_PER_BLOCK) {
-    assert(threads > 0);
+                                 int threadsPerBlock = DEFAULT_THREADS_PER_BLOCK) {
+    if (threads == 0) {
+        return std::make_pair(0, 0);
+    } 
     assert(threads <= MAX_THREADS);
     if (threads < threadsPerBlock) threadsPerBlock = threads;
     int blocks =  threads % threadsPerBlock == 0 ?
-        threads / threadsPerBlock :
-        threads / threadsPerBlock + 1;
+                  threads / threadsPerBlock :
+                  threads / threadsPerBlock + 1;
     if (blocks > MAX_BLOCKS) blocks = MAX_BLOCKS;
-    LOG(INFO) << "The kernel is configured to (" << blocks << ", " << threadsPerBlock << ")";
+    // LOG(INFO) << "The kernel is configured to (" << blocks
+    //           << ", " << threadsPerBlock << ")";
     return std::make_pair(blocks, threadsPerBlock);
 }
 
@@ -82,7 +109,7 @@ void enableAllPeerAccess() {
     CUDA_CHECK(cudaGetDeviceCount(&numGpus));
     LOG(INFO) << numGpus << " GPU detected";
     for (int i = 0; i < numGpus; i++) {
-        for (int j = i+1; j < numGpus; j++) {
+        for (int j = i + 1; j < numGpus; j++) {
             enablePeerAccess(i, j);
             enablePeerAccess(j, i);
         }
@@ -94,21 +121,29 @@ void disableAllPeerAccess() {
     CUDA_CHECK(cudaGetDeviceCount(&numGpus));
     LOG(INFO) << numGpus << " GPU detected";
     for (int i = 0; i < numGpus; i++) {
-        for (int j = i+1; j < numGpus; j++) {
+        for (int j = i + 1; j < numGpus; j++) {
             disablePeerAccess(i, j);
             disablePeerAccess(j, i);
         }
     }
 }
 
-
+void expectOverlapOnAllDevices() {
+    int dev_count;
+    cudaDeviceProp prop;
+    cudaGetDeviceCount(&dev_count);
+    for (int i = 0; i < dev_count; i++) {
+        cudaGetDeviceProperties(&prop, i);
+        assert(prop.deviceOverlap) ;
+    }
+}
 
 /**
  * Checks if the string is a numeric number
  * @param  str String to check
  * @return     True If the string represents a numeric number
  */
-bool isNumeric(const char * str) {
+bool isNumeric(const char *str) {
     assert(str);
     while ((* str) != '\0') {
         if (!isdigit(* str)) {
@@ -132,23 +167,7 @@ size_t hashCode(size_t a) {
     return a;
 }
 
-/** Get current time in milliseconds */
-double currentTimeMillis() {
-    timeval t;
-    gettimeofday(&t, NULL);
-    double millis = static_cast<double> (t.tv_sec * 1000.0);
-    millis += static_cast<double >(t.tv_usec / 1000.0);
-    return millis;
-}
 
-/** Get current time in milliseconds */
-double currentTimeSeconds() {
-    timeval t;
-    gettimeofday(&t, NULL);
-    double seconds = static_cast<double> (t.tv_sec);
-    seconds += static_cast<double>(t.tv_usec / 1000000.0);
-    return seconds;
-}
 
 }  // namespace util
 

@@ -1,4 +1,0 @@
-all: ../build/bin/bitmap
-
-../build/bin/bitmap: unitest/unitest_bitmap.cu
-	nvcc -Iolive $< -o $@ -gencode=arch=compute_35,code=\"sm_35,compute_35\"
