@@ -149,6 +149,7 @@ public:
                   << "ms, comm=" << std::setprecision(2) << commTime << "ms";
 
 
+
         // Scatter the local state according to the inbox's messages.
         // Launch the scatter kernel for each inbox
         // Skipped if the inbox is empty
@@ -177,25 +178,23 @@ public:
             CUDA_CHECK(cudaStreamSynchronize(partitions[i].streams[1]));
         }
 
-        for (int i = 0; i < partitions.size(); i++) {
-            for (int j = 0; j < partitions.size(); j++) {
-                if (i == j) continue;
-                partitions[i].inboxes[j].swapBuffers();
-            }
-        }
-
         // Profiling the time
         totalTime = getTimeMillis() - startTime;
         LOG(INFO) << "edgeMapScatter=" << std::setprecision(2) << totalTime << "ms";
 
 
-        // Peek the activated vertices in vertex phase
+        // Peek the activated vertices after the edge phase
         for (int i = 0; i < partitions.size(); i++) {
             partitions[i].workset.persist();
+            partitions[i].accumulators.persist();
             for (int j = 0; j < partitions[i].workset.length; j++) {
-                printf("%d: %d\n", partitions[i].globalIds[j], partitions[i].workset[j]);
+                printf("%d: %d\t%f\n", partitions[i].globalIds[j],
+                       partitions[i].workset[j], partitions[i].accumulators[j]);
             }
         }
+
+
+
     }
 
     /**
@@ -299,6 +298,7 @@ public:
         }
         LOG(INFO) << "vertexMap=" << std::setprecision(2) << totalTime << "ms";
 
+#if 0
         // Peek the activated vertices in edge phase
         for (int i = 0; i < partitions.size(); i++) {
             partitions[i].workqueue.persist();
@@ -311,7 +311,7 @@ public:
             }
             printf("\n");
         }
-
+#endif
     }
 
 

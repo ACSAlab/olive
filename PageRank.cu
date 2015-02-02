@@ -44,6 +44,8 @@ struct PR_Vertex {
 struct PR_edge_F {
     __device__
     inline float gather(PR_Vertex srcValue, EdgeId outdegree) {
+        printf("%f %d\n", srcValue.rank, outdegree);
+
         return srcValue.rank / outdegree;
     }
 
@@ -102,7 +104,7 @@ int main(int argc, char **argv) {
     int rounds = cl.getOptionIntValue("-rounds", 20);
 
     Olive<PR_Vertex, float> olive;
-    olive.readGraph(inFile, 2);
+    olive.readGraph(inFile, 1);
 
     // The final result, which will be aggregated.
     ranks_g = new float[olive.getVertexCount()];
@@ -114,16 +116,28 @@ int main(int argc, char **argv) {
 
     int i = 0;
     while (olive.getWorkqueueSize() > 0) {
-        if (i > rounds) break;
+        if (i >= rounds) break;
         printf("\n\n\niterations %d\n", i++);
         olive.edgeMap<PR_edge_F>(PR_edge_F());
+
+        olive.vertexTransform<PR_at_F>(PR_at_F());
+        for (int i = 0; i < olive.getVertexCount(); i++) {
+            printf("%d %f %f\n", i, ranks_g[i], deltas_g[i]);
+        }
+
         olive.vertexMap<PR_vertex_F>(PR_vertex_F());
+        olive.vertexTransform<PR_at_F>(PR_at_F());
+        for (int i = 0; i < olive.getVertexCount(); i++) {
+            printf("%d %f %f\n", i, ranks_g[i], deltas_g[i]);
+        }
+
+
     }
 
-    olive.vertexTransform<PR_at_F>(PR_at_F());
-    for (int i = 0; i < olive.getVertexCount(); i++) {
-        printf("%d %f %f\n", i, ranks_g[i], deltas_g[i]);
-    }
+    // olive.vertexTransform<PR_at_F>(PR_at_F());
+    // for (int i = 0; i < olive.getVertexCount(); i++) {
+    //     printf("%d %f %f\n", i, ranks_g[i], deltas_g[i]);
+    // }
 
     return 0;
 }

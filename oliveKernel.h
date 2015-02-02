@@ -62,7 +62,7 @@ void edgeGatherKernel(
     VertexValue srcValue = vertexValues[srcId];
     EdgeId first = vertices[srcId];
     EdgeId last = vertices[srcId + 1];
-    EdgeId outdegree = last - first + 1;
+    EdgeId outdegree = last - first;
 
     for (EdgeId edge = first; edge < last; edge ++) {
         PartitionId dstPid = edges[edge].partitionId;

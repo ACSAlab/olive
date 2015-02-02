@@ -52,7 +52,7 @@ template<typename MessageValue>
 class MessageBox {
 public:
     MessageValue *buffer;
-    MessageValue *bufferRecv;   /** Using a double-buffering method. */
+    // MessageValue *bufferRecv;   * Using a double-buffering method. 
     size_t        maxLength;    /** Maximum length of the buffer */
     size_t        length;       /** Current capacity of the message box. */
 
@@ -60,7 +60,7 @@ public:
      * Constructor. `deviceId < 0` if there is no memory reserved
      * It is important to give a NULL value to avoid delete a effective pointer.
      */
-    MessageBox(): maxLength(0), length(0), buffer(NULL), bufferRecv(NULL) {}
+    MessageBox(): maxLength(0), length(0), buffer(NULL) {}
 
     /** Allocating space for the message box */
     void reserve(size_t len) {
@@ -70,9 +70,9 @@ public:
         CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **>(&buffer),
                                   len * sizeof(MessageValue),
                                   cudaHostAllocPortable));
-        CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **>(&bufferRecv),
-                                  len * sizeof(MessageValue),
-                                  cudaHostAllocPortable));
+        // CUDA_CHECK(cudaMallocHost(reinterpret_cast<void **>(&bufferRecv),
+        //                           len * sizeof(MessageValue),
+        //                           cudaHostAllocPortable));
     }
 
     /**
@@ -96,7 +96,7 @@ public:
                                    cudaMemcpyDefault,
                                    stream));
 
-        CUDA_CHECK(cudaMemcpyAsync(bufferRecv,
+        CUDA_CHECK(cudaMemcpyAsync(buffer,
                                    other.buffer,
                                    length * sizeof(MessageValue),
                                    cudaMemcpyDefault,
@@ -107,11 +107,11 @@ public:
     /**
      * Exchanges two buffers.
      */
-    inline void swapBuffers() {
-        MessageValue *temp = buffer;
-        buffer = bufferRecv;
-        bufferRecv = temp;
-    }
+    // inline void swapBuffers() {
+    //     MessageValue *temp = buffer;
+    //     buffer = bufferRecv;
+    //     bufferRecv = temp;
+    // }
 
     inline void clear() {
         length = 0;
@@ -130,9 +130,9 @@ public:
         if (buffer) {
             CUDA_CHECK(cudaFreeHost(buffer));
         }
-        if (bufferRecv) {
-            CUDA_CHECK(cudaFreeHost(bufferRecv));
-        }
+        // if (bufferRecv) {
+        //     CUDA_CHECK(cudaFreeHost(bufferRecv));
+        // }
     }
 
     /** Destructor */
