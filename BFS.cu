@@ -36,19 +36,43 @@
 
 #define INF_COST 0x7fffffff
 
+__device__ int currentLevel_d;
+
+__global__ void setCurrentLevel(int level) {
+    currentLevel_d = level;
+}
+
 struct BFS_Vertex {
     int level;
 };
 
-struct BFS_F {
+struct BFS_edge_F {
+    __device__
+    inline bool gather(BFS_Vertex srcValue, EdgeId outdegree) {
+        if (srcValue.level == currentLevel_d - 1) {
+            return true;
+        }
+        return false;
+    }
+
+    __device__
+    inline void reduce(bool &accumulator, bool accum) {
+        if (accum) 
+            accumulator = true;
+    }
+};
+
+struct BFS_vertex_F {
     __device__
     inline bool cond(BFS_Vertex local) {
         return (local.level == INF_COST);
     }
 
     __device__
-    inline void update(BFS_Vertex &local, BFS_Vertex srcValue) {
-        local.level = srcValue.level + 1;
+    inline void update(BFS_Vertex &local, bool accum) {
+        if (accum) {
+            local.level = currentLevel_d;
+        }
     }
 };
 
@@ -57,11 +81,15 @@ struct BFS_init_F {
     BFS_init_F(int l): _level(l) {}
 
     __device__
-    inline BFS_Vertex operator() (BFS_Vertex v) {
+    inline void update(BFS_Vertex &v) {
         v.level = _level;
-        return v;
+    }
+
+    __device__ bool cond(BFS_Vertex v) {
+        return true;
     }
 };
+
 
 static int *level_g;
 
@@ -73,37 +101,46 @@ struct BFS_at_F {
 
 int main(int argc, char **argv) {
 
-    if (argc < 3) {
-        printf("wrong argument");
-        return 1;
+    CommandLine cl(argc, argv, "<inFile> [-rounds 10]");
+    char * inFile = cl.getArgument(0);
+    int rounds = cl.getOptionIntValue("-rounds", 10);
+
+    int currentLevel;
+
+    Olive<BFS_Vertex, bool> olive;
+    olive.readGraph(inFile, 2);
+
+    VertexId source = atoi(cl.getArgument(1));
+
+    // The final result, which will be aggregated.
+    level_g = new int[olive.getVertexCount()];
+
+    // Initialize all vertices, and filter the source vertex
+    olive.vertexFilter<BFS_init_F>(BFS_init_F(INF_COST));
+    BFS_Vertex zero;
+    zero.level = 0;
+    olive.setElementById<BFS_Vertex>(source, zero);    
+
+    int iterations = 0;
+    currentLevel = 1;
+    while (olive.getWorkqueueSize() > 0 && iterations < 10) {
+        /* todo(liye) set currentLevel more naturally */
+        cudaSetDevice(0);
+        setCurrentLevel <<<1, 1>>> (currentLevel);
+        cudaSetDevice(1);
+        setCurrentLevel <<<1, 1>>> (currentLevel);
+
+        printf("\n\n\niterations: %d\n", iterations++);
+        olive.edgeMap<BFS_edge_F>(BFS_edge_F());
+
+        olive.vertexMap<BFS_vertex_F>(BFS_vertex_F());
+        currentLevel++;
+
+        olive.vertexTransform<BFS_at_F>(BFS_at_F());
+
+        for (int i = 0; i < olive.getVertexCount(); i++) {
+            printf("%d ", level_g[i]);
+        }
     }
-
-
-    
-    
-    // Olive<BFS_Vertex> olive;
-    // olive.init(argv[1], 2);
-
-    // VertexId source = atoi(argv[2]);
-
-    // // The final result, which will be aggregated.
-    // level_g = new int[olive.getVertexCount()];
-
-    // // Initialize all vertices, and filter the source vertex
-    // olive.vertexMap<BFS_init_F>(BFS_init_F(INF_COST));
-    // olive.vertexFilter<BFS_init_F>(source, BFS_init_F(0));
-
-    // int iterations = 0;
-    // while (!olive.isTerminated()) {
-    //     printf("\niterations: %d\n", iterations++);
-    //     olive.edgeFilter<BFS_F>(BFS_F());
-    // }
-
-    // olive.vertexTransform<BFS_at_F>(BFS_at_F());
-
-    // for (int i = 0; i < olive.getVertexCount(); i++) {
-    //     printf("%d ", level_g[i]);
-    // }
-
     return 0;
 }

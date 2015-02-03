@@ -52,6 +52,20 @@ template<typename VertexValue, typename AccumValue>
 class Olive {
 public:
     /**
+     * set the element with specific id with a certain value
+     */
+    template<typename F>
+    void setElementById(int id, F value) {
+      for (int i = 0; i < partitions.size(); i++) {
+          for (VertexId j = 0; j < partitions[i].vertexValues.size(); j++) {
+              if (partitions[i].globalIds[j] == id) {
+                  partitions[i].vertexValues.set(j, value);
+              }
+          }
+          partitions[i].vertexValues.persist();
+      }
+    }
+    /**
      *
      * Since the graph is edge-cutted, some of the destination vertices may be
      * in remote partition, message passing schemes will be used. The whole
