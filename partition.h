@@ -117,7 +117,12 @@ public:
      *
      * @note a.k.a row offsets in matrix terminology.
      */
-    GRD<EdgeId> vertices;
+    GRD<EdgeId>     vertices;
+
+    /**
+     * Partition-wise vertex state values.
+     */
+    GRD<VertexValue> vertexValues;
 
     /**
      * Stores the destination vertex to represent an outgoing edge.
@@ -138,11 +143,6 @@ public:
      * aggregating the final results.
      */
     GRD<VertexId> globalIds;
-
-    /**
-     * Partition-wise vertex state values.
-     */
-    GRD<VertexValue> vertexValues;
 
     /**
      * For each vertex an accumulator is cached to perform computation.
@@ -236,8 +236,8 @@ public:
         numParts = subgraph.numParts;
         // TODO(onesuper): change later
         deviceId = partitionId % 2;
-        vertexCount = subgraph.nodes();
-        edgeCount = subgraph.edges();
+        vertexCount = subgraph.vertexCount;
+        edgeCount = subgraph.edgeCount;
         // Only reserve memory if the graph has at least one edge/node
         if (edgeCount == 0 || vertexCount == 0) {
             LOG(WARNING) << "Parition" << partitionId << " #vertices= "
@@ -284,6 +284,7 @@ public:
             localId += 1;
         }
         assert(localId == vertexCount);
+
         // Traverses all nodes and out-going edges to set up CSR data.
         VertexId vertexCursor = 0;
         EdgeId   edgeCursor   = 0;

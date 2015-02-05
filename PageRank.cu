@@ -44,8 +44,6 @@ struct PR_Vertex {
 struct PR_edge_F {
     __device__
     inline float gather(PR_Vertex srcValue, EdgeId outdegree) {
-        printf("%f %d\n", srcValue.rank, outdegree);
-
         return srcValue.rank / outdegree;
     }
 
@@ -104,7 +102,7 @@ int main(int argc, char **argv) {
     int rounds = cl.getOptionIntValue("-rounds", 20);
 
     Olive<PR_Vertex, float> olive;
-    olive.readGraph(inFile, 1);
+    olive.readGraph(inFile, 2);
 
     // The final result, which will be aggregated.
     ranks_g = new float[olive.getVertexCount()];

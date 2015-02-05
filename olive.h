@@ -298,8 +298,7 @@ public:
         }
         LOG(INFO) << "vertexMap=" << std::setprecision(2) << totalTime << "ms";
 
-#if 0
-        // Peek the activated vertices in edge phase
+        // Peek the activated vertices after the vertex phase
         for (int i = 0; i < partitions.size(); i++) {
             partitions[i].workqueue.persist();
             CUDA_CHECK(cudaSetDevice(partitions[i].deviceId));
@@ -311,7 +310,6 @@ public:
             }
             printf("\n");
         }
-#endif
     }
 
 
@@ -436,7 +434,7 @@ public:
 
         flex::Graph<int, int> graph;
         graph.fromEdgeListFile(path);
-        vertexCount = graph.nodes();
+        vertexCount = graph.vertexCount;
 
         RandomEdgeCut random;
         auto subgraphs = graph.partitionBy(random, numParts);

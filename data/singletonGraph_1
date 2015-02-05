@@ -1,2 +1,8 @@
+# The input is an edge list file where each line represents a directional edge
+# in the graph. More specifically, each line in the file contains two integers:
+# a source vertex id and a target vertex id, and an optional edge-associated
+# value. Lines that begin with `#` are treated as comments. 
+# The first line gives the number of the nodes and edges.
 # Nodes: 1
 # Edges: 0
+1 0
