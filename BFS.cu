@@ -33,14 +33,83 @@
 
 #include "oliver.h"
 
+#define INF_COST 0x7fffffff
+
+
+struct BFS_Vertex {
+    int level;
+};
+
+struct BFS_edge_F {
+    __device__
+    inline int gather(BFS_Vertex srcValue, EdgeId outdegree) {
+        return srcValue.level + 1;        
+    }
+
+    __device__
+    inline void reduce(int &accumulator, int accum) {
+        accumulator = accum; // benign race happens
+    }
+};
+
+struct BFS_vertex_F {
+    __device__
+    inline bool cond(BFS_Vertex local, VertexId id) {
+        return (local.level == INF_COST);
+    }
+
+    __device__
+    inline void update(BFS_Vertex &local, int accum) {
+        local.level = accum;
+    }
+};
+
+
+struct BFS_source_F {
+    int _id;
+    BFS_source_F(int id): _id(id) {}
+
+    __device__ bool cond(BFS_Vertex v, VertexId id) {
+        return (id == _id);
+    }
+
+    __device__
+    inline void update(BFS_Vertex &v, int accum) {
+        v.level = 0;
+    }
+};
+
+struct BFS_init_F {
+    __device__
+    inline void update(BFS_Vertex &v) {
+        v.level = INF_COST;
+    }
+};
+
+
 
 int main(int argc, char **argv) {
 
-    CommandLine cl(argc, argv, "<inFile>");
+    CommandLine cl(argc, argv, "<inFile> -s 2");
     char * inFile = cl.getArgument(0);
+    int src = cl.getOptionIntValue("-s", 0);
 
-    Oliver<int, int> oliver;
-    oliver.readGraph(inFile);
+    Oliver<BFS_Vertex, int> olive;
+    olive.readGraph(inFile);
+
+    olive.vertexMap<BFS_init_F>(BFS_init_F());
+    olive.vertexFilter<BFS_source_F>(BFS_source_F(src));
+
+    int iterations = 0;
+
+    while (olive.getWorkqueueSize() > 0) {
+        printf("\nBFS iterations %d\n", iterations++);
+        olive.edgeMap<BFS_edge_F>(BFS_edge_F());
+        olive.vertexFilter<BFS_vertex_F>(BFS_vertex_F());
+        //olive.print();
+    }
+
+    olive.print();
 
     return 0;
 }
