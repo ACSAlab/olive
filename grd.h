@@ -114,9 +114,10 @@ public:
     }
 
 
-    inline void print() {
+    inline void print(int maxLen = 1024) {
         persist();
         for (int i = 0; i < length; i++) {
+            if (i == maxLen) break;
             printf("%d ", elemsHost[i]);
         }
         printf("\n");

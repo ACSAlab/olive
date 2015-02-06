@@ -48,26 +48,24 @@ void edgeMapKernel(
     const VertexId *workqueue,
     const VertexId *workqueueSize,
     const EdgeId   *vertices,
-    const Vertex   *edges,
+    const VertexId *outgoingEdges,
     VertexValue    *vertexValues,
     AccumValue     *accumulators,
     int            *activties,
-    MessageBox< VertexMessage<AccumValue> > *outboxes,
     F f)
 {
     int tid = THREAD_INDEX;
     if (tid >= *workqueueSize) return;
     VertexId srcId = workqueue[tid];
-    VertexValue srcValue = vertexValues[srcId];
     EdgeId start = vertices[srcId];
     EdgeId end = vertices[srcId + 1];
     EdgeId outdegree = end - start;
+    VertexValue srcValue = vertexValues[srcId];
 
-    for (EdgeId edge = start; edge < end; edge ++) {
-        PartitionId dstPid = edges[edge].partitionId;
+    for (EdgeId e = start; e < end; e ++) {
         // Edge level parallelism, which is exploited by SIMD lanes
         AccumValue accum = f.gather(srcValue, outdegree);
-        VertexId dstId = edges[edge].localId;
+        VertexId dstId = outgoingEdges[e];
         f.reduce(accumulators[dstId], accum);
         activties[dstId] = 1;
     }
@@ -85,31 +83,13 @@ template<typename VertexValue,
          typename F>
 __global__
 void vertexMapKernel(
-    int         *activties,
     int          verticeCount,
     VertexValue *vertexValues,
-    AccumValue  *accumulators,
-    VertexId    *workqueue,
-    VertexId    *workqueueSize,
     F f)
 {
     int tid = THREAD_INDEX;
     if (tid >= verticeCount) return;
-
-    if (activties[tid] == 0) return;
-
-    // Deactivate anyway, since we only want the vertex with changed
-    // accumulator to be activated in the vertex phase.
-    activties[tid] = 0;  
-
-    if (f.cond(vertexValues[tid])) {
-        f.update(vertexValues[tid], accumulators[tid]);
-
-        // if the local state is modified,  activate it
-        activties[tid] = 1;        
-        VertexId pos = atomicAdd(workqueueSize, 1);
-        workqueue[pos] = tid;
-    }
+    f.update(vertexValues[tid]);  
 }
 
 template<typename VertexValue,
@@ -120,14 +100,18 @@ void vertexFilterKernel(
     int         *activties,
     int          verticeCount,
     VertexValue *vertexValues,
+    AccumValue  *accumulators,
     VertexId    *workqueue,
     VertexId    *workqueueSize,
     F f)
 {
     int tid = THREAD_INDEX;
     if (tid >= verticeCount) return;
-    if (f.cond(vertexValues[tid])) {
-        f.update(vertexValues[tid]);
+    if (activties[tid] == 0) return;
+    // Deactivate at first. Then recover
+    activties[tid] = 0; 
+    if (f.cond(vertexValues[tid], tid)) {
+        f.update(vertexValues[tid], accumulators[tid]);
         activties[tid] = 1;
         VertexId pos = atomicAdd(workqueueSize, 1);
         workqueue[pos] = tid;
