@@ -32,6 +32,7 @@
  */
 
 #include "oliver.h"
+#include "unitestBFS.h"
 
 #define INF_COST 0x7fffffff
 
@@ -87,29 +88,56 @@ struct BFS_init_F {
 };
 
 
+int * levels_g;
+struct BFS_gather_F {
+    inline void operator() (int i, BFS_Vertex v) {
+        levels_g[i] = v.level;
+    }
+};
+
 
 int main(int argc, char **argv) {
 
     CommandLine cl(argc, argv, "<inFile> -s 2");
     char * inFile = cl.getArgument(0);
     int src = cl.getOptionIntValue("-s", 0);
+    bool validate = cl.getOption("-validate");
+
+    CsrGraph<int, int> graph;
+    graph.fromEdgeListFile(inFile);
+
 
     Oliver<BFS_Vertex, int> olive;
-    olive.readGraph(inFile);
+    olive.readGraph(graph);
 
     olive.vertexMap<BFS_init_F>(BFS_init_F());
     olive.vertexFilter<BFS_source_F>(BFS_source_F(src));
 
     int iterations = 0;
 
+    double start = getTimeMillis();
+
     while (olive.getWorkqueueSize() > 0) {
-        printf("\nBFS iterations %d\n", iterations++);
+        // printf("\nBFS iterations %d\n", iterations);
         olive.edgeMap<BFS_edge_F>(BFS_edge_F());
         olive.vertexFilter<BFS_vertex_F>(BFS_vertex_F());
         //olive.print();
+        iterations++;
     }
 
-    olive.print();
+    LOG(INFO) << "time=" << getTimeMillis() - start << "ms";
 
+
+    if (!validate) return;
+
+    // Gather results
+    levels_g = new int[olive.getVertexCount()];
+    olive.vertexTransform<BFS_gather_F>(BFS_gather_F());
+    auto result = std::vector<int>(levels_g, levels_g + olive.getVertexCount());
+
+    // Call serial BFS
+    auto serial_result = bfs_serial(graph, src);
+    expect_equal(result, serial_result);
+    printf("validated!\n");
     return 0;
 }

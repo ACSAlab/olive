@@ -95,10 +95,7 @@ public:
     }
 
 
-    void readGraph(const char *path) {
-        CsrGraph<int, int> graph;
-        graph.fromEdgeListFile(path);
-
+    void readGraph(const CsrGraph<int, int> &graph) {
         vertexCount = graph.vertexCount;
         edgeCount = graph.edgeCount;
 
@@ -141,6 +138,20 @@ public:
         // workset.print();
         vertexValues.print();
     }
+
+    template<typename F>
+    void vertexTransform(F f) {
+        vertexValues.persist();
+        for (VertexId j = 0; j < vertexValues.size(); j++) {
+            f(j, vertexValues[j]);
+        }
+    }
+
+    /** Returns the number of the vertices in the graph. */
+    inline VertexId getVertexCount() const {
+        return vertexCount;
+    }
+
 
 private:
     /** Record the edge and vertex number of each partition. */
