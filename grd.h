@@ -85,13 +85,10 @@ public:
     }
 
     /**
-     * Set all the elements to the value `x` on the host, then caches.
+     * Set all the elements to the value `x` on the device.
      */
     void allTo(T x) {
-        for (size_t i = 0; i < length; i++) {
-            elemsHost[i] = x;
-        }
-        cache();
+        CUDA_CHECK(cudaMemset(elemsDevice, x, sizeof(T) * length));
     }
 
     /**
@@ -114,13 +111,13 @@ public:
     }
 
 
-    inline void print(int maxLen = 1024) {
-        persist();
+    /**
+     * Call the user defined print() function to print the GRD.
+     */
+    inline void print() {
         for (int i = 0; i < length; i++) {
-            if (i == maxLen) break;
-            printf("%d ", elemsHost[i]);
+            elemsHost[i].print();
         }
-        printf("\n");
     }
 
 
@@ -147,10 +144,10 @@ public:
         }
     }
 
-    /** Destructor **/
-    ~GRD() {
-        del();
-    }
+    // /** Destructor **/
+    // ~GRD() {
+    //     del();
+    // }
 };
 
 #endif  // GRD_H

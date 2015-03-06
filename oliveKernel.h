@@ -167,6 +167,4 @@ void vertexFilterKernel(
     }
 }
 
-
-
 #endif  // OLIVE_KERNEL_H

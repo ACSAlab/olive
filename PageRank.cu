@@ -31,111 +31,103 @@
  * Last Modified: 2015-01-13
  */
 
-#include "olive.h"
+#include "oliver.h"
 
-#define DAMPING 0.85
-#define EPSILON 0.000002
+FILE * outputFile;
 
 struct PR_Vertex {
-    float rank;
-    float delta;
+    double rank;
+    double delta;
+
+    void print() {
+        fprintf(outputFile, "%f\t%f\n", rank, delta);
+    }
 };
 
 struct PR_edge_F {
     __device__
-    inline float gather(PR_Vertex srcValue, EdgeId outdegree) {
+    inline double gather(PR_Vertex srcValue, EdgeId outdegree) {
         return srcValue.rank / outdegree;
     }
 
     __device__
-    inline void reduce(float &accumulator, float accum) {
+    inline void reduce(double &accumulator, double accum) {
         atomicAdd(&accumulator, accum);
     }
-};
+};  // EdgeMap
 
 struct PR_vertex_F {
-    __device__ bool cond(PR_Vertex v) {
-        return (fabs(v.delta) > EPSILON);
+    double damping, fraction, addConstant;
+
+    PR_vertex_F(double _damping, double _oneOverN, double _fraction) : 
+        damping(_damping), fraction(_fraction),
+        addConstant( (1-_damping) * _oneOverN ) {}
+
+    __device__ bool cond(PR_Vertex v, VertexId id) {
+        return (fabs(v.delta) > (fraction * v.rank));
     }
 
     __device__
-    inline void update(PR_Vertex &v, float accum) {
-        float rank_new = (1-DAMPING) + DAMPING * accum;
-        v.delta = rank_new - v.rank;
-        v.rank = rank_new;
+    inline void update(PR_Vertex &v, double accum) {
+        v.delta = damping * accum + addConstant - v.rank;
+        v.rank += v.delta;
     }
-};
-
+};  // VertexFilter
 
 struct PR_init_F {
-    float _rank;
-    PR_init_F(float r): _rank(r) {}
+    double rank;
 
-    __device__
-    inline void update(PR_Vertex &v) {
-        v.rank = _rank;
-        v.delta = _rank;
-    }
+    PR_init_F(double _rank): rank(_rank) {}
 
-    __device__ bool cond(PR_Vertex v) {
+    __device__ bool cond(PR_Vertex v, VertexId id) {
         return true;
     }
-};
 
-static float *ranks_g;
-static float *deltas_g;
-
-
-
-struct PR_at_F {
-    inline void operator() (VertexId id, PR_Vertex v) {
-        ranks_g[id] = v.rank;
-        deltas_g[id] = v.delta;
+    __device__
+    inline void update(PR_Vertex &v, double accum) {
+        v.rank = rank;
+        v.delta = rank;
     }
-};
-
+};  // VertexMap
 
 int main(int argc, char **argv) {
-
-    CommandLine cl(argc, argv, "<inFile> [-rounds 20]");
+    
+    CommandLine cl(argc, argv, "<inFile> [-max 100]");
     char * inFile = cl.getArgument(0);
-    int rounds = cl.getOptionIntValue("-rounds", 20);
+    int maxIterations = cl.getOptionIntValue("-max", 100);
 
-    Olive<PR_Vertex, float> olive;
-    olive.readGraph(inFile, 2);
+    // Read in the graph data.
+    CsrGraph<int, int> graph;
+    graph.fromEdgeListFile(inFile);
+    Oliver<PR_Vertex, double> ol;
+    ol.readGraph(graph);
 
-    // The final result, which will be aggregated.
-    ranks_g = new float[olive.getVertexCount()];
-    deltas_g = new float[olive.getVertexCount()];
+    // Write the result.
+    outputFile = fopen("PageRank.txt", "w");
 
+    // Algorithm specific parameters
+    const double damping = 0.85;
+    const double oneOverN = 1.0 / ol.getVertexCount();
+    const double fraction = 0.01;
 
     // Initialize all vertices rank value to 1/n, and activate them
-    olive.vertexFilter<PR_init_F>(PR_init_F(1.0 /  olive.getVertexCount()));
+    ol.vertexFilter<PR_init_F>(PR_init_F(oneOverN));
+
+    double start = getTimeMillis();
 
     int i = 0;
-    while (olive.getWorkqueueSize() > 0) {
-        if (i >= rounds) break;
-        printf("\n\n\niterations %d\n", i++);
-        olive.edgeMap<PR_edge_F>(PR_edge_F());
-
-        olive.vertexTransform<PR_at_F>(PR_at_F());
-        for (int i = 0; i < olive.getVertexCount(); i++) {
-            printf("%d %f %f\n", i, ranks_g[i], deltas_g[i]);
-        }
-
-        olive.vertexMap<PR_vertex_F>(PR_vertex_F());
-        olive.vertexTransform<PR_at_F>(PR_at_F());
-        for (int i = 0; i < olive.getVertexCount(); i++) {
-            printf("%d %f %f\n", i, ranks_g[i], deltas_g[i]);
-        }
-
-
+    int qSize;
+    while ((qSize = ol.getWorkqueueSize()) > 0) {
+        if (i >= maxIterations) break;
+        LOG(INFO) << "\nPR iterations " << i << " size: " << qSize;
+        ol.edgeMap<PR_edge_F>(PR_edge_F());
+        ol.vertexFilter<PR_vertex_F>(PR_vertex_F(damping, oneOverN, fraction));
+        i++;
     }
 
-    // olive.vertexTransform<PR_at_F>(PR_at_F());
-    // for (int i = 0; i < olive.getVertexCount(); i++) {
-    //     printf("%d %f %f\n", i, ranks_g[i], deltas_g[i]);
-    // }
+    LOG(INFO) << "time=" << getTimeMillis() - start << "ms";
+
+    ol.printVertices();
 
     return 0;
 }

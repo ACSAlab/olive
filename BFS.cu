@@ -32,112 +32,110 @@
  */
 
 #include "oliver.h"
-#include "unitestBFS.h"
 
-#define INF_COST 0x7fffffff
-
+FILE * outputFile;
 
 struct BFS_Vertex {
     int level;
+
+    inline void print() {
+        fprintf(outputFile, "%d\n", level);
+    }
 };
 
 struct BFS_edge_F {
     __device__
-    inline int gather(BFS_Vertex srcValue, EdgeId outdegree) {
-        return srcValue.level + 1;        
+    inline int gather(BFS_Vertex src, EdgeId outdegree) {
+        return src.level + 1;        
     }
 
     __device__
     inline void reduce(int &accumulator, int accum) {
         accumulator = accum; // benign race happens
     }
-};
+};  // EdgeMap
 
 struct BFS_vertex_F {
-    __device__
-    inline bool cond(BFS_Vertex local, VertexId id) {
-        return (local.level == INF_COST);
-    }
+    int infiniteCost;
+
+    BFS_vertex_F(int _inf) : infiniteCost(_inf) {}
 
     __device__
-    inline void update(BFS_Vertex &local, int accum) {
-        local.level = accum;
-    }
-};
-
-
-struct BFS_source_F {
-    int _id;
-    BFS_source_F(int id): _id(id) {}
-
-    __device__ bool cond(BFS_Vertex v, VertexId id) {
-        return (id == _id);
+    inline bool cond(BFS_Vertex v, VertexId id) {
+        return (v.level == infiniteCost);
     }
 
     __device__
     inline void update(BFS_Vertex &v, int accum) {
-        v.level = 0;
+        v.level = accum;
     }
-};
+};  // VertexFilter
 
 struct BFS_init_F {
+    int infiniteCost;
+    VertexId srcId;
+
+    BFS_init_F(int _cost, VertexId _id) : infiniteCost(_cost), srcId(_id) {}
+
     __device__
-    inline void update(BFS_Vertex &v) {
-        v.level = INF_COST;
+    inline void update(BFS_Vertex &v, VertexId id) {
+        if (id == srcId) {
+            v.level = 0;
+        } else {
+            v.level = infiniteCost;
+        }
     }
-};
-
-
-int * levels_g;
-struct BFS_gather_F {
-    inline void operator() (int i, BFS_Vertex v) {
-        levels_g[i] = v.level;
-    }
-};
-
+};  // VertexMap
 
 int main(int argc, char **argv) {
 
-    CommandLine cl(argc, argv, "<inFile> -s 2");
+    CommandLine cl(argc, argv, "<inFile> -s 0");
     char * inFile = cl.getArgument(0);
-    int src = cl.getOptionIntValue("-s", 0);
-    bool validate = cl.getOption("-validate");
+    int source = cl.getOptionIntValue("-s", 0);
 
+    // Read in the graph data.
     CsrGraph<int, int> graph;
     graph.fromEdgeListFile(inFile);
+    Oliver<BFS_Vertex, int> ol;
+    ol.readGraph(graph);
 
+    // Write the result.
+    outputFile = fopen("BFS.txt", "w");
 
-    Oliver<BFS_Vertex, int> olive;
-    olive.readGraph(graph);
+    // Algorithm specific parameters
+    const int infiniteCost = 0x7fffffff;
 
-    olive.vertexMap<BFS_init_F>(BFS_init_F());
-    olive.vertexFilter<BFS_source_F>(BFS_source_F(src));
+    ol.vertexMap<BFS_init_F>(BFS_init_F(infiniteCost, source));
 
-    int iterations = 0;
+    // Dense representation
+    VertexSubset vertexFrontier(graph.vertexCount, source, true);
 
-    double start = getTimeMillis();
+    // Sparse representation
+    VertexSubset edgeFrontier(graph.vertexCount, false);
 
-    while (olive.getWorkqueueSize() > 0) {
-        // printf("\nBFS iterations %d\n", iterations);
-        olive.edgeMap<BFS_edge_F>(BFS_edge_F());
-        olive.vertexFilter<BFS_vertex_F>(BFS_vertex_F());
-        //olive.print();
-        iterations++;
+    double start = getTimeMillis();    
+
+    int i = 0;
+    while (vertexFrontier.size() > 0) {
+        
+
+        //LOG(INFO) << "BFS iterations " << i++ << ", size: " << vertexFrontier.size();
+
+        ol.edgeMap<BFS_edge_F>(edgeFrontier, vertexFrontier, BFS_edge_F());
+        // vertexFrontier.print();
+        vertexFrontier.clear();
+
+        ol.vertexFilter<BFS_vertex_F>(vertexFrontier, edgeFrontier, BFS_vertex_F(infiniteCost));
+        // edgeFrontier.print();
+        edgeFrontier.clear();
     }
 
     LOG(INFO) << "time=" << getTimeMillis() - start << "ms";
 
+    ol.printVertices();
 
-    if (!validate) return;
+    edgeFrontier.del();
+    vertexFrontier.del();
 
-    // Gather results
-    levels_g = new int[olive.getVertexCount()];
-    olive.vertexTransform<BFS_gather_F>(BFS_gather_F());
-    auto result = std::vector<int>(levels_g, levels_g + olive.getVertexCount());
-
-    // Call serial BFS
-    auto serial_result = bfs_serial(graph, src);
-    expect_equal(result, serial_result);
-    printf("validated!\n");
     return 0;
 }

@@ -70,6 +70,7 @@ public:
             assert(partitions[i].vertexCount > 0);
             // Clear the accumulator before the gather phase starts
             partitions[i].accumulators.allTo(0);
+            partitions[i].accumulators.cache();
             // Clear the outboxes before we put messages to it
             for (int rmtPid = 0; rmtPid < partitions.size(); rmtPid++) {
                 if (rmtPid == i) continue;

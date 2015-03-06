@@ -60,7 +60,9 @@ OLIVE = $(wildcard *.h)
 
 ALL =  BFS
 
-all: $(ALL)
+TEST = testBFS
+
+all: $(ALL) $(TEST)
 
 %: %.cu $(OLIVE)
 	$(NVCC) -o $@ $< $(NVCCFLAGS) -I$(CUDA_INC_DIR) -L$(CUDA_LIB_DIR) -lcudart

@@ -24,15 +24,6 @@
 
 
 /**
- * Test the bfs implementation
- *
- * Author: Yichao Cheng (onesuperclark@gmail.com)
- * Created on: 2014-10-28
- * Last Modified: 2014-12-18
- */
-
-
-/**
  * The serial version is used to validate the correctness of the GPU version.
  *
  * Author: Yichao Cheng (onesuperclark@gmail.com)
@@ -40,53 +31,53 @@
  * Last Modified: 2014-12-18
  */
 
-#include <vector>
 #include <deque>
 
-#define INF_COST 0x7fffffff
-
-void expect_equal(std::vector<int> v1, std::vector<int> v2) {
-    assert(v1.size() == v2.size());
-    for (int i = 0; i < v1.size(); i++) {
-        assert(v1[i] == v2[i]);
-    }
-}
-
+#include "csrGraph.h"
+#include "commandLine.h"
+#include "timer.h"
 /**
  * The following algorithm comes from CLRS.
- *
- * @param partition The graph partition
- * @param nodes     The number of nodes in the graph.
- * @param source    The source node to traverse from.
- * @return a vector containing the BFS level for each node.
  */
-std::vector<int> bfs_serial(const CsrGraph<int, int> &graph, VertexId source) {
+int main(int argc, char **argv) {
 
-    GRD<int> levels;
-    levels.reserve(graph.vertexCount);
-    levels.allTo(INF_COST);
+    CommandLine cl(argc, argv, "<inFile> -s 0");
+    char * inFile = cl.getArgument(0);
+    int source = cl.getOptionIntValue("-s", 0);
+    CsrGraph<int, int> graph;
+    graph.fromEdgeListFile(inFile);
 
-    GRD<int> visited;
-    visited.reserve(graph.vertexCount);
-    visited.allTo(0);
+    const int infiniteCost = 0x7fffffff;
 
-    std::deque<VertexId> current;
-    current.push_back(source);
-    levels.set(source, 0);
-    visited.set(source, 1);
+    int * levels;
+    levels = new int[graph.vertexCount];
+    for (int i = 0; i < graph.vertexCount; i++) {
+        levels[i] = infiniteCost;
+    }
+    levels[source]= 0;
 
-    while(!current.empty()) {
-        VertexId v = current.front();
-        current.pop_front();        // Dequeue
-        for (EdgeId e = graph.srcVertices[v]; e < graph.srcVertices[v+1]; e ++) {
+    std::deque<VertexId> frontier;
+    frontier.push_back(source);
+
+    double start = getTimeMillis();
+
+    while(!frontier.empty()) {
+        VertexId v = frontier.front();
+        frontier.pop_front();        // Dequeue
+        for (EdgeId e = graph.srcVertices[v]; e < graph.srcVertices[v+1]; e++) {
             VertexId dst = graph.outgoingEdges[e];
-            if (visited[dst] == 0) {
+            if (levels[dst]  == infiniteCost) {
                 levels[dst] = levels[v] + 1; 
-                current.push_back(dst);
-                visited[dst] = 1;
+                frontier.push_back(dst);
             }
         }
     }
 
-    return std::vector<int>(levels.elemsHost, levels.elemsHost + graph.vertexCount);
+    LOG(INFO) << "time=" << getTimeMillis() - start << "ms";
+
+    FILE * outputFile;
+    outputFile = fopen("BFS.serial.txt", "w");
+    for (int i = 0; i < graph.vertexCount; i++) {
+        fprintf(outputFile, "%d\n", levels[i]);
+    }
 }

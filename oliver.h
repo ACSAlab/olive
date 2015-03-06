@@ -40,32 +40,57 @@
 #include "utils.h"
 #include "commandLine.h"
 #include "grd.h"
+#include "vertexSubset.h"
 #include "oliverKernel.h"
 
 template<typename VertexValue, typename AccumValue>
 class Oliver {
 public:
-
+    /**
+     * The edgeMap function accepts a dense vertexSubset and produces
+     * a sparse one.
+     */
     template<typename F>
-    void edgeMap(F f) {
+    void edgeMap(VertexSubset dstV, VertexSubset srcV, F f) {
+
         // Clear the accumulator before the gather phase starts
         accumulators.allTo(0);
-        // Transfer the queue size back to config the kernel
-        CUDA_CHECK(D2H(workqueueSize, workqueueSizeDevice, sizeof(VertexId)));
 
-        auto c = util::kernelConfig(*workqueueSize);
+        auto c = util::kernelConfig(srcV.size());
         edgeMapKernel<VertexValue, AccumValue, F> <<< c.first, c.second>>>(
-            workqueue.elemsDevice,
-            workqueueSizeDevice,
+            srcV.workqueue.elemsDevice,
+            srcV.qSizeDevice,
             srcVertices.elemsDevice,
             outgoingEdges.elemsDevice,
             vertexValues.elemsDevice,
             accumulators.elemsDevice,
-            workset.elemsDevice,
+            dstV.workset.elemsDevice,
             f);
         CUDA_CHECK(cudaThreadSynchronize());
     }
 
+    /**
+     * The vertexFilter function accepts a sparse vertexSubset and produces
+     * a dense one.
+     */
+    template<typename F>
+    void vertexFilter(VertexSubset dstV, VertexSubset srcV, F f) {
+        auto c = util::kernelConfig(vertexCount);
+        vertexFilterKernel<VertexValue, AccumValue, F> <<< c.first, c.second>>>(
+            srcV.workset.elemsDevice,
+            vertexCount,
+            vertexValues.elemsDevice,
+            accumulators.elemsDevice,
+            dstV.workqueue.elemsDevice,
+            dstV.qSizeDevice,
+            f);
+        CUDA_CHECK(cudaThreadSynchronize());
+    }
+
+    /**
+     * vertexMap is used to update the local vertex state. 
+     * The computation is topology-independent.
+     */
     template<typename F>
     void vertexMap(F f) {
         auto c = util::kernelConfig(vertexCount);
@@ -76,75 +101,22 @@ public:
         CUDA_CHECK(cudaThreadSynchronize());
     }
 
-    template<typename F>
-    void vertexFilter(F f) {
-        // Clear the workqueue before generating it
-        *workqueueSize = 0;
-        CUDA_CHECK(H2D(workqueueSizeDevice, workqueueSize, sizeof(VertexId)));
-
-        auto c = util::kernelConfig(vertexCount);
-        vertexFilterKernel<VertexValue, AccumValue, F> <<< c.first, c.second>>>(
-            workset.elemsDevice,
-            vertexCount,
-            vertexValues.elemsDevice,
-            accumulators.elemsDevice,
-            workqueue.elemsDevice,
-            workqueueSizeDevice,
-            f);
-        CUDA_CHECK(cudaThreadSynchronize());
-    }
-
-
     void readGraph(const CsrGraph<int, int> &graph) {
         vertexCount = graph.vertexCount;
         edgeCount = graph.edgeCount;
-
         srcVertices.reserve(vertexCount + 1);
-        memcpy(srcVertices.elemsHost, graph.srcVertices, sizeof(EdgeId) * (vertexCount + 1));
-        srcVertices.cache();
-
         outgoingEdges.reserve(edgeCount);
-        memcpy(outgoingEdges.elemsHost, graph.outgoingEdges, sizeof(VertexId) * edgeCount);
-        outgoingEdges.cache();
-
         vertexValues.reserve(vertexCount);
         accumulators.reserve(vertexCount);
-
-        workset.reserve(vertexCount);
-        workset.allTo(1); // All activated at the firsr place
-
-        workqueue.reserve(vertexCount);
-
-        workqueueSize = (VertexId *) malloc(sizeof(VertexId));
-        *workqueueSize = 0;
-        CUDA_CHECK(cudaMalloc((void **) &workqueueSizeDevice, sizeof(VertexId)));
-        CUDA_CHECK(H2D(workqueueSizeDevice, workqueueSize, sizeof(VertexId)));
-
-        allVerticesInactive = (bool *) malloc(sizeof(bool));
-        CUDA_CHECK(cudaMalloc((void **) &allVerticesInactiveDevice, sizeof(bool)));
+        memcpy(srcVertices.elemsHost, graph.srcVertices, sizeof(EdgeId) * (vertexCount + 1));
+        memcpy(outgoingEdges.elemsHost, graph.outgoingEdges, sizeof(VertexId) * edgeCount);
+        srcVertices.cache();
+        outgoingEdges.cache();
     }
 
-    /**
-     * Transfer all the `workqueueSize` back and sum them up.
-     */
-    inline VertexId getWorkqueueSize() {
-        CUDA_CHECK(D2H(workqueueSize, workqueueSizeDevice, sizeof(VertexId)));
-        return *workqueueSize;
-    }
-
-    void print() {
-        CUDA_CHECK(D2H(workqueueSize, workqueueSizeDevice, sizeof(VertexId)));
-        workqueue.print(*workqueueSize);
-        // workset.print();
-        vertexValues.print();
-    }
-
-    template<typename F>
-    void vertexTransform(F f) {
+    inline void printVertices() {
         vertexValues.persist();
-        for (VertexId j = 0; j < vertexValues.size(); j++) {
-            f(j, vertexValues[j]);
-        }
+        vertexValues.print();
     }
 
     /** Returns the number of the vertices in the graph. */
@@ -152,6 +124,12 @@ public:
         return vertexCount;
     }
 
+    ~Oliver() {
+        srcVertices.del();
+        outgoingEdges.del();
+        vertexValues.del();
+        accumulators.del();
+    }
 
 private:
     /** Record the edge and vertex number of each partition. */
@@ -162,8 +140,9 @@ private:
      * CSR related data structure.
      */
     GRD<EdgeId>      srcVertices;
-    // GRD<EdgeId>      dstVertices;
     GRD<VertexId>    outgoingEdges;
+
+    // GRD<EdgeId>      dstVertices;
     // GRD<VertexId>    incomingEdges;
 
     /**
@@ -172,29 +151,6 @@ private:
     GRD<VertexValue> vertexValues;
     GRD<AccumValue>  accumulators;
 
-    /**
-     * Use a bitmap to represent the working set.
-     */
-    GRD<int> workset;
-
-    /**
-     * Use a queue to keep the work complexity low
-     */
-    GRD<VertexId>  workqueue;
-    VertexId *workqueueSize;
-    VertexId *workqueueSizeDevice;
-
-    /**
-     * A single variable to indicate the activeness of all vertices
-     * in the partition.
-     */
-    bool *allVerticesInactive;
-    bool *allVerticesInactiveDevice;
-
-
-    // cudaStream_t     streams[2];
-    // cudaEvent_t      startEvents[4];
-    // cudaEvent_t      endEvents[4];
 
 };
 

@@ -51,7 +51,7 @@ void edgeMapKernel(
     const VertexId *outgoingEdges,
     VertexValue    *vertexValues,
     AccumValue     *accumulators,
-    int            *activties,
+    int            *workset,
     F f)
 {
     int tid = THREAD_INDEX;
@@ -67,7 +67,7 @@ void edgeMapKernel(
         AccumValue accum = f.gather(srcValue, outdegree);
         VertexId dstId = outgoingEdges[e];
         f.reduce(accumulators[dstId], accum);
-        activties[dstId] = 1;
+        workset[dstId] = 1;
     }
 }
 
@@ -89,7 +89,7 @@ void vertexMapKernel(
 {
     int tid = THREAD_INDEX;
     if (tid >= verticeCount) return;
-    f.update(vertexValues[tid]);  
+    f.update(vertexValues[tid], tid);  
 }
 
 template<typename VertexValue,
@@ -97,7 +97,7 @@ template<typename VertexValue,
          typename F>
 __global__
 void vertexFilterKernel(
-    int         *activties,
+    int         *workset,
     int          verticeCount,
     VertexValue *vertexValues,
     AccumValue  *accumulators,
@@ -107,12 +107,9 @@ void vertexFilterKernel(
 {
     int tid = THREAD_INDEX;
     if (tid >= verticeCount) return;
-    if (activties[tid] == 0) return;
-    // Deactivate at first. Then recover
-    activties[tid] = 0; 
+    if (workset[tid] == 0) return;
     if (f.cond(vertexValues[tid], tid)) {
         f.update(vertexValues[tid], accumulators[tid]);
-        activties[tid] = 1;
         VertexId pos = atomicAdd(workqueueSize, 1);
         workqueue[pos] = tid;
     }

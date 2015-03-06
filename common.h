@@ -123,4 +123,23 @@ public:
 };
 
 
+/**
+ * A double precision atomic add. Based on the algorithm in the NVIDIA CUDA
+ * Programming Guide V4.0, Section B.11.
+ * 
+ * @param address the content is incremented by val
+ * @param val the value to be added to the content of address
+ * @return old value stored at address
+ */
+inline __device__ double atomicAdd(double* address, double val) {
+  unsigned long long int* address_as_ull = (unsigned long long int*)address;
+  unsigned long long int old = *address_as_ull, assumed;
+  do {
+    assumed = old;
+    old = atomicCAS(address_as_ull, assumed,
+                    __double_as_longlong(val + __longlong_as_double(assumed)));
+  } while (assumed != old);
+  return __longlong_as_double(old);
+}
+
 #endif  // COMMON_H
