@@ -108,8 +108,8 @@ public:
         outgoingEdges.reserve(edgeCount);
         vertexValues.reserve(vertexCount);
         accumulators.reserve(vertexCount);
-        memcpy(srcVertices.elemsHost, graph.srcVertices, sizeof(EdgeId) * (vertexCount + 1));
-        memcpy(outgoingEdges.elemsHost, graph.outgoingEdges, sizeof(VertexId) * edgeCount);
+        memcpy(srcVertices.elemsHost, graph.vertices, sizeof(EdgeId) * (vertexCount + 1));
+        memcpy(outgoingEdges.elemsHost, graph.edges, sizeof(VertexId) * edgeCount);
         srcVertices.cache();
         outgoingEdges.cache();
     }

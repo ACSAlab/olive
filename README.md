@@ -4,7 +4,11 @@
 
 ## Input Format
 
-The input of a graph application is an edge list file where each line represents a directional edge in the graph. More specifically, each line in the file contains two integers: a source vertex id and a target vertex id, and an optional edge-associated value. Lines that begin with `#` are treated as comments. For example:
+The Olive framework support two kinds of data format for the input graph: the *edge-list-file* format and the *dimacs* format. Users can read the corresponding graph file by calling two built-in APIs: `fromEdgeListFile()` and `fromDimacsFile()`.
+
+### Edge-list-file
+
+Each line in an edge list file represents a directional edge in the graph. More specifically, each line in the file contains two integers: a source vertex id and a target vertex id, and an optional edge-associated value. Lines that begin with `#` are treated as comments. For example:
 
     # Comment Line
     # SourceId  TargetId  <EdgeValue>
@@ -12,10 +16,14 @@ The input of a graph application is an edge list file where each line represents
     1    2    <0.2>
     1    8    <0.9>
 
+### Dimacs (Metis)
+
+This format is borrowed from the Dimacs 10th Challenge which can be referred to http://www.cc.gatech.edu/dimacs10/downloads.shtml
+
 
 ## Running
 
-Olive provides a handful of input examples (located in `/data`) for quick test.You can run the applications on them by typing:
+Olive provides a handful of input examples (located in `/data`) for quick run.You can run the applications on them by typing:
 
     $./PageRank ./data/gridGraph_15 
 

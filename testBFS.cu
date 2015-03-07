@@ -64,8 +64,8 @@ int main(int argc, char **argv) {
     while(!frontier.empty()) {
         VertexId v = frontier.front();
         frontier.pop_front();        // Dequeue
-        for (EdgeId e = graph.srcVertices[v]; e < graph.srcVertices[v+1]; e++) {
-            VertexId dst = graph.outgoingEdges[e];
+        for (EdgeId e = graph.vertices[v]; e < graph.vertices[v+1]; e++) {
+            VertexId dst = graph.edges[e];
             if (levels[dst]  == infiniteCost) {
                 levels[dst] = levels[v] + 1; 
                 frontier.push_back(dst);

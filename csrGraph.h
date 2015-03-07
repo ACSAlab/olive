@@ -128,7 +128,7 @@ public:
             default:
                 if (parsedEdges == VertexId(-1)) {
                     sscanf(line, "%lld %lld", &llnodes, &lledges);
-                    LOG(INFO) << "Parsing coo: " << llnodes << " nodes, " << lledges << " edges";
+                    LOG(INFO) << "Parsing graph: " << llnodes << " nodes, " << lledges << " edges";
                     assert(llnodes > 0);
                     tuples = (EdgeTupleInt *) malloc(lledges * sizeof(EdgeTupleInt));
                     initGraph(llnodes, lledges);
@@ -146,7 +146,7 @@ public:
                   << "ms to parse " << parsedEdges << " edge tuples.";
 
         // Generate the edge list by clustering the edge tuples by src Id.
-        std::stable_sort(tuples, tuples + edgeCount, edgeTupleSrcCompare<EdgeTupleInt>);
+        // std::stable_sort(tuples, tuples + edgeCount, edgeTupleSrcCompare<EdgeTupleInt>);
 
         VertexId prevSrc = VertexId(-1);
         for (EdgeId e = 0; e < edgeCount; e++) {
@@ -167,7 +167,7 @@ public:
         if (tuples) free(tuples);
 
         LOG(INFO) << "It took " << stopwatch.getElapsedMillis()
-                  << "ms to generate the CSR graph.";
+                  << "ms to generate the CSR graph from edge list file.";
     }
 
 
@@ -210,7 +210,7 @@ public:
                 if (parsedVertices == VertexId(-1)) {
                     fscanf(file, "%lld %lld[^\n]", &llnodes, &lledges, line);
                     initGraph(llnodes, lledges * 2);
-                    LOG(INFO) << "Parsing dimacs: " << llnodes << " nodes, " << lledges << " (bi)edges";
+                    LOG(INFO) << "Parsing graph: " << llnodes << " nodes, " << lledges << " (bi)edges";
                 } else {
                     fscanf(file, "%lld", &lldstId); // process next edge in the same row
                     // The ids for dimacs of start at 1
@@ -226,10 +226,13 @@ public:
             vertices[parsedVertices] = parsededges;
         }
 
-        assert(parsededges == edgeCount);
+        if (parsededges != edgeCount) {
+            LOG(ERROR) << parsededges << "!=" << edgeCount;
+            assert(0);
+        }
 
         LOG(INFO) << "It took " << stopwatch.getElapsedMillis()
-                  << "ms to generate the CSR graph.";
+                  << "ms to generate the CSR graph from Dimacs file.";
     }
 
     /**

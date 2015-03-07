@@ -18,8 +18,8 @@ int main(int argc, char **argv) {
 
     CommandLine cl(argc, argv, "<inFile> [-dimacs] [-verbose]");
     char * inFile = cl.getArgument(0);
-    bool dimacs = cl.getOption("-dimacs"); 
     bool verbose = cl.getOption("-verbose");
+    bool dimacs = cl.getOption("-dimacs");
 
     CsrGraph<int, int> graph;
     if (dimacs) {
@@ -27,6 +27,7 @@ int main(int argc, char **argv) {
     } else {
         graph.fromEdgeListFile(inFile);
     }
+    
 
     // Basic Information
     std::cout << "Nodes:" << graph.vertexCount;
