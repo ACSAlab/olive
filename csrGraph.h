@@ -49,7 +49,7 @@
 
 
 /**
- * Flexible graph representation for in-memory querying or manipulating.
+ * CSR graph representation.
  */
 template <typename VertexValue, typename EdgeValue>
 class CsrGraph {
@@ -57,40 +57,30 @@ public:
     /** Total number of the vertices and edges in the graph. */
     VertexId     vertexCount;
     EdgeId       edgeCount;
- 
-    /** Buffers for CSR-formatted graph (as outgoing edges). */
-    EdgeId      *srcVertices;
-    VertexId    *outgoingEdges;
-    EdgeValue   *outgoingEdgeValues;
 
-    /** Buffers for CSR-formatted graph (as incoming edges). */
-    EdgeId      *dstVertices;
-    VertexId    *incomingEdges;
-    EdgeValue   *incomingEdgeValues;
+    /** Buffers for CSR-formatted graph. */
+    EdgeId      *vertices;
+    VertexId    *edges;
+    EdgeValue   *edgeValues;
+    VertexValue *vertexValues;
 
-    /** Constructor */
-    CsrGraph(): vertexCount(0), edgeCount(0),
-        srcVertices(NULL), dstVertices(NULL),
-        outgoingEdges(NULL), incomingEdges(NULL),
-        outgoingEdgeValues(NULL), incomingEdgeValues(NULL) {}
+    CsrGraph(): vertexCount(0), edgeCount(0), vertices(NULL), edges(NULL),
+        edgeValues(NULL), vertexValues(NULL) {}
 
     ~CsrGraph() {
-        if (srcVertices) delete srcVertices;
-        if (dstVertices) delete dstVertices;
-        if (outgoingEdges) delete outgoingEdges;
-        if (incomingEdges) delete incomingEdges;
-        if (outgoingEdgeValues) delete outgoingEdgeValues;
-        if (incomingEdgeValues) delete incomingEdgeValues;
+        if (vertices) delete vertices;
+        if (edges) delete edges;
+        if (edgeValues) delete edgeValues;
+        if (vertexValues) delete vertexValues;
     }
 
-    void initGraph(VertexId vertices, EdgeId edges) {
-        vertexCount = vertices;
-        edgeCount = edges;
-        // TODO: here just ignore the values
-        srcVertices = new EdgeId[vertexCount + 1];
-        dstVertices = new EdgeId[vertexCount + 1];
-        outgoingEdges = new VertexId[edgeCount];
-        incomingEdges = new VertexId[edgeCount];
+    void initGraph(VertexId _vertexCount, EdgeId _edgeCount) {
+        vertexCount = _vertexCount;
+        edgeCount = _edgeCount;
+        vertices = new EdgeId[vertexCount + 1];
+        edges = new VertexId[edgeCount];
+        edgeValues = new EdgeValue[edgeCount];
+        vertexValues = new VertexValue[vertexCount];
     }
 
     /**
@@ -125,8 +115,11 @@ public:
 
         char line[1024];
         typedef EdgeTuple<int> EdgeTupleInt;
-        EdgeTupleInt *parsedEdgeTuples; // Buffer for the parsed edge tuples.
         EdgeId parsedEdges = VertexId(-1);
+        long long llnodes, lledges;
+
+        // Cache the parsed edge tuples in the buffer.
+        EdgeTupleInt *tuples;
 
         while (fscanf(file, "%[^\n]\n", line) > 0) {
             switch (line[0]) {
@@ -134,17 +127,16 @@ public:
                 break;
             default:
                 if (parsedEdges == VertexId(-1)) {
-                    long long llnodes, lledges;
                     sscanf(line, "%lld %lld", &llnodes, &lledges);
-                    LOG(INFO) << "Parsing " << llnodes << " nodes, " << lledges << " edges";
+                    LOG(INFO) << "Parsing coo: " << llnodes << " nodes, " << lledges << " edges";
                     assert(llnodes > 0);
-                    parsedEdgeTuples = (EdgeTupleInt *) malloc(lledges * sizeof(EdgeTupleInt));
+                    tuples = (EdgeTupleInt *) malloc(lledges * sizeof(EdgeTupleInt));
                     initGraph(llnodes, lledges);
                     parsedEdges = 0;
                 } else {
                     long long llsrc, lldst;
                     sscanf(line, "%lld %lld", &llsrc, &lldst);
-                    parsedEdgeTuples[parsedEdges] = EdgeTupleInt(llsrc, lldst, 1);
+                    tuples[parsedEdges] = EdgeTupleInt(llsrc, lldst, 1);
                     parsedEdges++;
                 }
             }
@@ -153,105 +145,122 @@ public:
         LOG(INFO) << "It took " << stopwatch.getElapsedMillis()
                   << "ms to parse " << parsedEdges << " edge tuples.";
 
-        // Generate the outgoing edge list first.
-        // Clustering the edge tuples by src Id.
-        std::stable_sort(parsedEdgeTuples, parsedEdgeTuples + edgeCount,
-                         edgeTupleSrcCompare<EdgeTupleInt>);
+        // Generate the edge list by clustering the edge tuples by src Id.
+        std::stable_sort(tuples, tuples + edgeCount, edgeTupleSrcCompare<EdgeTupleInt>);
 
         VertexId prevSrc = VertexId(-1);
-        for (EdgeId edge = 0; edge < edgeCount; edge++) {
-            outgoingEdges[edge] = parsedEdgeTuples[edge].dstId;
-            VertexId src = parsedEdgeTuples[edge].srcId;
-            // Fill up the missing srcs
+        for (EdgeId e = 0; e < edgeCount; e++) {
+            edges[e] = tuples[e].dstId;
+            VertexId src = tuples[e].srcId;
+            // Fill up the missing `src`s
             for (VertexId v = prevSrc + 1; v <= src; v++) {
-                srcVertices[v] = edge;
+                vertices[v] = e;
             }
             prevSrc = src;
         }
 
         // Fill out trailing vertices whose has not connecting edges.
         for (VertexId v = prevSrc + 1; v <= vertexCount; v++) {
-            srcVertices[v] = edgeCount;
+            vertices[v] = edgeCount;
         }
 
-        // Generate the incoming edge list.
-        // Clustering the edge tuples by dst Id.
-        std::stable_sort(parsedEdgeTuples, parsedEdgeTuples + edgeCount,
-                         edgeTupleDstCompare<EdgeTupleInt>);
-
-        VertexId prevDst = VertexId(-1);
-        for (EdgeId edge = 0; edge < edgeCount; edge++) {
-            VertexId dst = parsedEdgeTuples[edge].dstId;
-            incomingEdges[edge] = parsedEdgeTuples[edge].srcId;
-            // Fill up the missing dsts
-            for (VertexId v = prevDst + 1; v <= dst; v++) {
-                dstVertices[v] = edge;
-            }
-            prevDst = dst;
-        }
-
-        // Fill out trailing vertices whose has not connecting edges.
-        for (VertexId v = prevDst + 1; v <= vertexCount; v++) {
-            dstVertices[v] = edgeCount;
-        }
+        if (tuples) free(tuples);
 
         LOG(INFO) << "It took " << stopwatch.getElapsedMillis()
                   << "ms to generate the CSR graph.";
+    }
 
-        if (parsedEdgeTuples) free(parsedEdgeTuples);
+
+    /**
+     * From dimacs graph format
+     */
+    void fromDimacsFile(const char *path) {
+        FILE *file = fopen(path, "r");
+        if (file == NULL) {
+            LOG(ERROR) << "Can not open graph file: " << path;
+            return;
+        }
+
+        Stopwatch stopwatch;
+        stopwatch.start();
+
+        char line[1024];
+        char  c;
+        EdgeId parsededges = 0;
+        VertexId parsedVertices = VertexId(-1);
+        long long llnodes, lledges, lldstId;
+
+        while ((c = fgetc(file)) != EOF) {
+            switch (c) {
+            case '#': // comment: skip any char encountered until see a '\n'
+                while ((c = fgetc(file)) != EOF) {
+                    if (c == '\n') break;
+                }
+                break;
+            case ' ':
+            case '\t': // white space
+                break;
+            case '\n':
+                // end of line: begin to process the next node
+                parsedVertices++;
+                vertices[parsedVertices] = parsededges;
+                break;
+            default:
+                ungetc(c, file); // put the char back
+                if (parsedVertices == VertexId(-1)) {
+                    fscanf(file, "%lld %lld[^\n]", &llnodes, &lledges, line);
+                    initGraph(llnodes, lledges * 2);
+                    LOG(INFO) << "Parsing dimacs: " << llnodes << " nodes, " << lledges << " (bi)edges";
+                } else {
+                    fscanf(file, "%lld", &lldstId); // process next edge in the same row
+                    // The ids for dimacs of start at 1
+                    edges[parsededges] = lldstId - 1;
+                    parsededges++;
+                }
+            } // end of switch
+        }
+
+        // Fill out any trailing rows that didn't have explicit lines
+        while (parsedVertices < vertexCount) {
+            parsedVertices++;
+            vertices[parsedVertices] = parsededges;
+        }
+
+        assert(parsededges == edgeCount);
+
+        LOG(INFO) << "It took " << stopwatch.getElapsedMillis()
+                  << "ms to generate the CSR graph.";
     }
 
     /**
      * Print the graph on the screen as the outgoing edges.
      */
-    void printOutEdges(bool withValue = false) const {
-        for (VertexId src = 0; src < vertexCount; src++) {
-            std::cout << "[" << src << "] ";
-            for (EdgeId e = srcVertices[src]; e < srcVertices[src + 1]; e++) {
-                std::cout << " ->" << outgoingEdges[e];
+    void print(bool verbose = false) const {
+        if (verbose) {
+            for (VertexId v = 0; v < vertexCount; v++) {
+                printf("[%lld] ", v);
+                for (EdgeId e = vertices[v]; e < vertices[v + 1]; e++) {
+                    std::cout << " ->" << edges[e];
+                    printf(" ->%lld", edges[e]);
+                }
+                printf("\n");
             }
-            std::cout << std::endl;
         }
-    }
 
-    /**
-     * Print the graph on the screen as the outgoing edges.
-     */
-    void printInEdges(bool withValue = false) const {
-        for (VertexId dst = 0; dst < vertexCount; dst++) {
-            std::cout << "[" << dst << "] ";
-            for (EdgeId e = dstVertices[dst]; e < dstVertices[dst + 1]; e++) {
-                std::cout << " <-" << incomingEdges[e];
-            }
-            std::cout << std::endl;
-        }
-    }
-
-    /**
-     * Prints the degree distribution in log-style on the screen.
-     * e.g., the output will look:
-     * {{{
-     * degreeLog[0]: 0         5%
-     * degreeLog[1]: (1, 2]   15%
-     * degreeLog[2]: (2, 4]   29%
-     * ...
-     * }}}
-     */
-    void printDegreeHistogram(bool outdegree = true) {
+        // Prints the degree distribution in log-style on the screen.
+        // e.g., the output will look like:
+        // degreeLog[0]: 0         5%
+        // degreeLog[1]: (1, 2]   15%
+        // degreeLog[2]: (2, 4]   29%
         size_t degLog[32];
         int slotMax = 0;
         for (int i = 0; i < 32; i++) {
             degLog[i] = 0;
         }
 
+        EdgeId deg;
         for (VertexId v = 0; v < vertexCount; v++) {
-            EdgeId deg;
-            if (outdegree) {
-                deg = srcVertices[v + 1] - srcVertices[v];
-            } else {
-                deg = dstVertices[v + 1] - dstVertices[v];
-            }
-
+            deg = vertices[v + 1] - vertices[v];
             int slot = 0;
             while (deg > 0) {
                 deg /= 2;
@@ -271,6 +280,7 @@ public:
                    degLog[i], (float) degLog[i] / vertexCount * 100);
         }
     }
+
 };
 
 

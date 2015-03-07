@@ -88,7 +88,7 @@ public:
     /**
      * Transfer all the `workqueueSize` back and sum them up.
      */
-    inline VertexId size() {
+    inline VertexId size() const {
         if (isDense) {
             CUDA_CHECK(D2H(qSize, qSizeDevice, sizeof(VertexId)));
             return *qSize;
@@ -106,7 +106,7 @@ public:
         }
     }
 
-    inline void print() {
+    inline void print() const {
         if (isDense) {
             CUDA_CHECK(D2H(qSize, qSizeDevice, sizeof(VertexId)));
             workqueue.persist();

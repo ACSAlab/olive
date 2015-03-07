@@ -92,6 +92,7 @@ int main(int argc, char **argv) {
     CommandLine cl(argc, argv, "<inFile> -s 0");
     char * inFile = cl.getArgument(0);
     int source = cl.getOptionIntValue("-s", 0);
+    bool verbose = cl.getOption("-verbose");
 
     // Read in the graph data.
     CsrGraph<int, int> graph;
@@ -108,34 +109,37 @@ int main(int argc, char **argv) {
     ol.vertexMap<BFS_init_F>(BFS_init_F(infiniteCost, source));
 
     // Dense representation
-    VertexSubset vertexFrontier(graph.vertexCount, source, true);
+    VertexSubset frontier(graph.vertexCount, source, true);
 
     // Sparse representation
-    VertexSubset edgeFrontier(graph.vertexCount, false);
+    VertexSubset edgeFontier(graph.vertexCount, false);
 
     double start = getTimeMillis();    
+    Stopwatch w;
+    w.start();
 
+    int frontierSize;
     int i = 0;
-    while (vertexFrontier.size() > 0) {
+    while ((frontierSize = frontier.size()) >0) {
         
+        // frontier.print();
+        ol.edgeMap<BFS_edge_F>(edgeFontier, frontier, BFS_edge_F());
+        frontier.clear();
 
-        //LOG(INFO) << "BFS iterations " << i++ << ", size: " << vertexFrontier.size();
+        // edgeFontier.print();
+        ol.vertexFilter<BFS_vertex_F>(frontier, edgeFontier, BFS_vertex_F(infiniteCost));
+        edgeFontier.clear();
 
-        ol.edgeMap<BFS_edge_F>(edgeFrontier, vertexFrontier, BFS_edge_F());
-        // vertexFrontier.print();
-        vertexFrontier.clear();
-
-        ol.vertexFilter<BFS_vertex_F>(vertexFrontier, edgeFrontier, BFS_vertex_F(infiniteCost));
-        // edgeFrontier.print();
-        edgeFrontier.clear();
+        if (verbose)
+            LOG(INFO) << "BFS iterations " << i++ << ", size " << frontierSize
+                      <<", time=" << w.getElapsedMillis() << "ms";
     }
 
     LOG(INFO) << "time=" << getTimeMillis() - start << "ms";
 
     ol.printVertices();
 
-    edgeFrontier.del();
-    vertexFrontier.del();
+    frontier.del();
 
     return 0;
 }
