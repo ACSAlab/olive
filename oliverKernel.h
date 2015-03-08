@@ -83,13 +83,15 @@ template<typename VertexValue,
          typename F>
 __global__
 void vertexMapKernel(
+    int         *workset,
     int          verticeCount,
     VertexValue *vertexValues,
     F f)
 {
-    int tid = THREAD_INDEX;
-    if (tid >= verticeCount) return;
-    f.update(vertexValues[tid], tid);  
+    int v = THREAD_INDEX;
+    if (v >= verticeCount) return;
+    if (workset[v] == 0) return;
+    f.update(vertexValues[v], v);  
 }
 
 template<typename VertexValue,
@@ -105,13 +107,16 @@ void vertexFilterKernel(
     VertexId    *workqueueSize,
     F f)
 {
-    int tid = THREAD_INDEX;
-    if (tid >= verticeCount) return;
-    if (workset[tid] == 0) return;
-    if (f.cond(vertexValues[tid], tid)) {
-        f.update(vertexValues[tid], accumulators[tid]);
+    int v = THREAD_INDEX;
+    if (v >= verticeCount) return;
+    if (workset[v] == 0) return;
+
+    f.update(vertexValues[v], accumulators[v]);
+
+
+    if (f.cond(vertexValues[v], v)) {
         VertexId pos = atomicAdd(workqueueSize, 1);
-        workqueue[pos] = tid;
+        workqueue[pos] = v;
     }
 }
 

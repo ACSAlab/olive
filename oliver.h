@@ -92,9 +92,10 @@ public:
      * The computation is topology-independent.
      */
     template<typename F>
-    void vertexMap(F f) {
+    void vertexMap(VertexSubset srcV, F f) {
         auto c = util::kernelConfig(vertexCount);
         vertexMapKernel<VertexValue, AccumValue, F> <<< c.first, c.second>>>(
+            srcV.workset.elemsDevice,
             vertexCount,
             vertexValues.elemsDevice,
             f);

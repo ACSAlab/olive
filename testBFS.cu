@@ -44,13 +44,18 @@ int main(int argc, char **argv) {
     CommandLine cl(argc, argv, "<inFile> -s 0");
     char * inFile = cl.getArgument(0);
     int source = cl.getOptionIntValue("-s", 0);
+    bool dimacs = cl.getOption("-dimacs");
+
     CsrGraph<int, int> graph;
-    graph.fromEdgeListFile(inFile);
+    if (dimacs) {
+        graph.fromDimacsFile(inFile);
+    } else {
+        graph.fromEdgeListFile(inFile);
+    }
 
     const int infiniteCost = 0x7fffffff;
 
-    int * levels;
-    levels = new int[graph.vertexCount];
+    int * levels = new int[graph.vertexCount];
     for (int i = 0; i < graph.vertexCount; i++) {
         levels[i] = infiniteCost;
     }

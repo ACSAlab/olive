@@ -40,7 +40,7 @@ struct PR_Vertex {
     double delta;
 
     void print() {
-        fprintf(outputFile, "%f\t%f\n", rank, delta);
+        fprintf(outputFile, "%f\n", rank);
     }
 };
 
@@ -54,7 +54,7 @@ struct PR_edge_F {
     inline void reduce(double &accumulator, double accum) {
         atomicAdd(&accumulator, accum);
     }
-};  // EdgeMap
+};  // edgeMap
 
 struct PR_vertex_F {
     double damping, fraction, addConstant;
@@ -69,10 +69,11 @@ struct PR_vertex_F {
 
     __device__
     inline void update(PR_Vertex &v, double accum) {
-        v.delta = damping * accum + addConstant - v.rank;
-        v.rank += v.delta;
+        double new_rank = damping * accum + addConstant;
+        v.delta = new_rank - v.rank;
+        v.rank = new_rank;
     }
-};  // VertexFilter
+};  // vertexFilter
 
 struct PR_init_F {
     double rank;
@@ -88,17 +89,24 @@ struct PR_init_F {
         v.rank = rank;
         v.delta = rank;
     }
-};  // VertexMap
+};  // vertexFilter
 
 int main(int argc, char **argv) {
     
-    CommandLine cl(argc, argv, "<inFile> [-max 100]");
+    CommandLine cl(argc, argv, "<inFile> [-max 20]");
     char * inFile = cl.getArgument(0);
-    int maxIterations = cl.getOptionIntValue("-max", 100);
+    int maxIterations = cl.getOptionIntValue("-max", 20);
+    bool dimacs = cl.getOption("-dimacs");
+    bool verbose = cl.getOption("-verbose");
 
-    // Read in the graph data.
+    // Read the graph file.
     CsrGraph<int, int> graph;
-    graph.fromEdgeListFile(inFile);
+    if (dimacs) {
+        graph.fromDimacsFile(inFile);
+    } else {
+        graph.fromEdgeListFile(inFile);
+    }
+
     Oliver<PR_Vertex, double> ol;
     ol.readGraph(graph);
 
@@ -110,24 +118,48 @@ int main(int argc, char **argv) {
     const double oneOverN = 1.0 / ol.getVertexCount();
     const double fraction = 0.01;
 
-    // Initialize all vertices rank value to 1/n, and activate them
-    ol.vertexFilter<PR_init_F>(PR_init_F(oneOverN));
+    // Frontiers
+    VertexSubset frontier(graph.vertexCount);            // Dense empty
+    VertexSubset edgeFrontier(graph.vertexCount, false); // Sparse empty
+    VertexSubset all(graph.vertexCount, true);           // Sparse universal
+
+    // Initialize all vertices rank value to 1/n
+    ol.vertexFilter<PR_init_F>(frontier, all, PR_init_F(oneOverN));
+    // ol.vertexMap<PR_init_F>(all, PR_init_F(oneOverN));
+
 
     double start = getTimeMillis();
+    Stopwatch w;
+    w.start();
 
-    int i = 0;
-    int qSize;
-    while ((qSize = ol.getWorkqueueSize()) > 0) {
-        if (i >= maxIterations) break;
-        LOG(INFO) << "\nPR iterations " << i << " size: " << qSize;
-        ol.edgeMap<PR_edge_F>(PR_edge_F());
-        ol.vertexFilter<PR_vertex_F>(PR_vertex_F(damping, oneOverN, fraction));
-        i++;
+    int iterations = 0;
+    while (iterations < maxIterations) {
+
+        // frontier.print();
+        ol.edgeMap<PR_edge_F>(edgeFrontier, frontier, PR_edge_F());
+        frontier.clear();
+
+
+        // edgeFrontier.print();
+        // Only active vertices will participate the next iteration.
+        // A vertex will be masked as active if and only if its `delta` < fraction * `rank`
+        ol.vertexFilter<PR_vertex_F>(frontier, edgeFrontier, PR_vertex_F(damping, oneOverN, fraction));
+        edgeFrontier.clear();
+
+        iterations++;
+        if (verbose) LOG(INFO) << "PR iterations " << iterations
+                               << ", size " << frontier.size()
+                               <<", time=" << w.getElapsedMillis() << "ms";
     }
 
     LOG(INFO) << "time=" << getTimeMillis() - start << "ms";
 
+
     ol.printVertices();
+
+    all.del();
+    frontier.del();
+    edgeFrontier.del();
 
     return 0;
 }

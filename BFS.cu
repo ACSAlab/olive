@@ -53,7 +53,7 @@ struct BFS_edge_F {
     inline void reduce(int &accumulator, int accum) {
         accumulator = accum; // benign race happens
     }
-};  // EdgeMap
+};  // edgeMap
 
 struct BFS_vertex_F {
     int infiniteCost;
@@ -69,7 +69,7 @@ struct BFS_vertex_F {
     inline void update(BFS_Vertex &v, int accum) {
         v.level = accum;
     }
-};  // VertexFilter
+};  // vertexFilter
 
 struct BFS_init_F {
     int infiniteCost;
@@ -85,13 +85,14 @@ struct BFS_init_F {
             v.level = infiniteCost;
         }
     }
-};  // VertexMap
+};  // vertexMap
+
 
 int main(int argc, char **argv) {
 
     CommandLine cl(argc, argv, "<inFile> -s 0");
     char * inFile = cl.getArgument(0);
-    int source = cl.getOptionIntValue("-s", 0);
+    VertexId source = cl.getOptionIntValue("-s", 0);
     bool verbose = cl.getOption("-verbose");
 
     // Read in the graph data.
@@ -106,33 +107,35 @@ int main(int argc, char **argv) {
     // Algorithm specific parameters
     const int infiniteCost = 0x7fffffff;
 
-    ol.vertexMap<BFS_init_F>(BFS_init_F(infiniteCost, source));
+    // Data structure
+    VertexSubset frontier(graph.vertexCount, source);    // Dense
+    VertexSubset edgeFrontier(graph.vertexCount, false); // Sparse
+    VertexSubset all(graph.vertexCount, true);
 
-    // Dense representation
-    VertexSubset frontier(graph.vertexCount, source, true);
-
-    // Sparse representation
-    VertexSubset edgeFontier(graph.vertexCount, false);
+    // Initializes the value of all vertices.
+    ol.vertexMap<BFS_init_F>(all, BFS_init_F(infiniteCost, source));
+    all.del();  // No longer used
 
     double start = getTimeMillis();    
     Stopwatch w;
     w.start();
 
-    int frontierSize;
-    int i = 0;
-    while ((frontierSize = frontier.size()) >0) {
+    int iterations = 0;
+    while (1) {
         
         // frontier.print();
-        ol.edgeMap<BFS_edge_F>(edgeFontier, frontier, BFS_edge_F());
+        ol.edgeMap<BFS_edge_F>(edgeFrontier, frontier, BFS_edge_F());
         frontier.clear();
 
-        // edgeFontier.print();
-        ol.vertexFilter<BFS_vertex_F>(frontier, edgeFontier, BFS_vertex_F(infiniteCost));
-        edgeFontier.clear();
+        // edgeFrontier.print();
+        ol.vertexFilter<BFS_vertex_F>(frontier, edgeFrontier, BFS_vertex_F(infiniteCost));
+        edgeFrontier.clear();
 
-        if (verbose)
-            LOG(INFO) << "BFS iterations " << i++ << ", size " << frontierSize
-                      <<", time=" << w.getElapsedMillis() << "ms";
+        if (frontier.size() == 0) break;
+        iterations++;
+        if (verbose) LOG(INFO) << "BFS iterations " << iterations
+                               <<", size " << frontier.size()
+                               <<", time=" << w.getElapsedMillis() << "ms";
     }
 
     LOG(INFO) << "time=" << getTimeMillis() - start << "ms";
@@ -140,6 +143,6 @@ int main(int argc, char **argv) {
     ol.printVertices();
 
     frontier.del();
-
+    edgeFrontier.del();
     return 0;
 }

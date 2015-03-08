@@ -42,39 +42,61 @@ int main(int argc, char **argv) {
 
     CommandLine cl(argc, argv, "<inFile> [-max 100]");
     char * inFile = cl.getArgument(0);
-    int maxIterations = cl.getOptionIntValue("-max", 100);
+    int maxIterations = cl.getOptionIntValue("-max", 1000);
+    bool dimacs = cl.getOption("-dimacs");
+
     CsrGraph<int, int> graph;
-    graph.fromEdgeListFile(inFile);
+    if (dimacs) {
+        graph.fromDimacsFile(inFile);
+    } else {
+        graph.fromEdgeListFile(inFile);
+    }
 
 
     const double damping = 0.85;
     const double oneOverN = 1.0 /  graph.vertexCount;
+    const double epsilon = 0.0000001;
 
-    GRD<double> ranks;
-    ranks.reserve(graph.vertexCount);
-    ranks.allTo(oneOverN);
+    double * ranks = new double[graph.vertexCount];
+    double * deltas = new double[graph.vertexCount];
+    double * nghSums = new double[graph.vertexCount];
+    for (int i = 0; i < graph.vertexCount; i++) {
+        ranks[i] = oneOverN;
+        deltas[i] = oneOverN;
+        nghSums[i] = 0;
+    }
 
-    GRD<double> nghSums;
-    nghSums.reserve(graph.vertexCount);
-    nghSums.allTo(0);
 
-    int i = 0;
-    while (i < maxIterations) {
+    double start = getTimeMillis();
+
+    int iterations = 0;
+    while (iterations++ < maxIterations) {
+        for (int i = 0; i < graph.vertexCount; i++) {
+            nghSums[i] = 0;
+        }
         for (VertexId v = 0; v < graph.vertexCount; v++) {
-            for (EdgeId e = graph.srcVertices[v]; e < graph.srcVertices[v + 1]; e ++) {
-                EdgeId outdeg = graph.srcVertices[v+1] - graph.srcVertices[v];
-                VertexId dst = graph.outgoingEdges[e];
-                nghSums[dst] += ranks[v] / outdeg;
+            for (EdgeId e = graph.vertices[v]; e < graph.vertices[v + 1];e ++) {
+                EdgeId outdeg = graph.vertices[v+1] - graph.vertices[v];
+                VertexId dst = graph.edges[e];
+                nghSums[dst] += (ranks[v] / outdeg);
             }
         }
 
         for (VertexId v = 0; v < graph.vertexCount; v++) {
-            ranks[v] = damping * nghSums[v] + (1 - damping) * oneOverN;
+            double new_rank = damping * nghSums[v] + (1 - damping) * oneOverN;
+            deltas[v] = new_rank - ranks[v];
+            ranks[v] = new_rank;
         }
 
-        nghSums.allTo(0);
-        i++;
+        double err = 0.0;
+        for (int i = 0; i < graph.vertexCount; i++) {
+            err += fabs(deltas[i]);
+        }
+        if (err < epsilon) break;
     }
+
+    LOG(INFO) << "iterations="<< iterations 
+              <<", time=" << getTimeMillis() - start << "ms";
 
     FILE * outputFile;
     outputFile = fopen("PageRank.serial.txt", "w");

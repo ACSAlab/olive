@@ -51,38 +51,47 @@ public:
     /** Make empty subset */
     VertexSubset() : qSize(NULL), qSizeDevice(NULL), isDense(false) {}
 
-    /** Make an empty vertex subset of n vertices. */
-    VertexSubset(VertexId n, bool _isDense = true) {
-        if (_isDense) {
-            // Reserve a dense represented GRD for output.
-            isDense = true;
-            workqueue.reserve(n);
-            qSize = (VertexId *) malloc(sizeof(VertexId));
-            *qSize = 0;
-            CUDA_CHECK(cudaMalloc((void **) &qSizeDevice, sizeof(VertexId)));
-            CUDA_CHECK(H2D(qSizeDevice, qSize, sizeof(VertexId)));
+    /**
+     * Make a sparse vertex subset of n vertices.
+     * @param n          The size of the set
+     * @param universal  Indicating the set is empty or universal
+     */
+    VertexSubset(VertexId n, bool universal) {
+        isDense = false;
+        workset.reserve(n);
+        if (universal) {
+            workset.allTo(1);
         } else {
-            isDense = false;
-            workset.reserve(n);
             workset.allTo(0);
         }
     }
 
-    /** Make a singleton vertex in range of n. */
-    VertexSubset(VertexId n, VertexId v, bool _isDense = true) {
-        if (_isDense) {
-            isDense = true;
-            workqueue.reserve(n);
-            workqueue.set(0, v);  // push v
-            qSize = (VertexId *) malloc(sizeof(VertexId));
-            *qSize = 1;
-            CUDA_CHECK(cudaMalloc((void **) &qSizeDevice, sizeof(VertexId)));
-            CUDA_CHECK(H2D(qSizeDevice, qSize, sizeof(VertexId)));
-        } else {
-            isDense = false;
-            workset.reserve(n);
-            workset.set(v, 1);
-        }
+    /** 
+     * Make a dense vertex subset of no vertex inside.
+     * @param n  The size of the set
+     */
+    VertexSubset(VertexId n) {
+        isDense = true;
+        workqueue.reserve(n);
+        qSize = (VertexId *) malloc(sizeof(VertexId));
+        *qSize = 0;
+        CUDA_CHECK(cudaMalloc((void **) &qSizeDevice, sizeof(VertexId)));
+        CUDA_CHECK(H2D(qSizeDevice, qSize, sizeof(VertexId)));
+    }
+
+    /** 
+     * Make a dense vertex subset of a singleton vertex in range of n.
+     * @param n  The size of the set
+     * @param v  The singleton vertex
+     */
+    VertexSubset(VertexId n, VertexId v) {
+        isDense = true;
+        workqueue.reserve(n);
+        workqueue.set(0, v);  // push v
+        qSize = (VertexId *) malloc(sizeof(VertexId));
+        *qSize = 1;
+        CUDA_CHECK(cudaMalloc((void **) &qSizeDevice, sizeof(VertexId)));
+        CUDA_CHECK(H2D(qSizeDevice, qSize, sizeof(VertexId)));
     }
 
     /**
@@ -106,7 +115,7 @@ public:
         }
     }
 
-    inline void print() const {
+    inline void print() {
         if (isDense) {
             CUDA_CHECK(D2H(qSize, qSizeDevice, sizeof(VertexId)));
             workqueue.persist();
