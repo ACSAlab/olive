@@ -44,6 +44,7 @@ int main(int argc, char **argv) {
     char * inFile = cl.getArgument(0);
     int maxIterations = cl.getOptionIntValue("-max", 1000);
     bool dimacs = cl.getOption("-dimacs");
+    bool verbose = cl.getOption("-verbose");
 
     CsrGraph<int, int> graph;
     if (dimacs) {
@@ -66,11 +67,12 @@ int main(int argc, char **argv) {
         nghSums[i] = 0;
     }
 
-
     double start = getTimeMillis();
+    Stopwatch w;
+    w.start();
 
     int iterations = 0;
-    while (iterations++ < maxIterations) {
+    while (iterations < maxIterations) {
         for (int i = 0; i < graph.vertexCount; i++) {
             nghSums[i] = 0;
         }
@@ -92,7 +94,14 @@ int main(int argc, char **argv) {
         for (int i = 0; i < graph.vertexCount; i++) {
             err += fabs(deltas[i]);
         }
+
+
+        if (verbose) LOG(INFO) << "PR iterations: " << iterations
+                               << ", err: " << err
+                               <<", time: " << w.getElapsedMillis() << "ms";
+
         if (err < epsilon) break;
+        iterations++;
     }
 
     LOG(INFO) << "iterations="<< iterations 

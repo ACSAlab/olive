@@ -64,8 +64,8 @@ public:
 #endif
     }
 
-    /** Returning the size */
-    inline size_t size() const {
+    /** Returning the capacity of GRD */
+    inline size_t capacity() const {
         return length;
     }
 

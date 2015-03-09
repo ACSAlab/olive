@@ -44,7 +44,7 @@ template<typename VertexValue,
          typename AccumValue,
          typename F>
 __global__
-void edgeMapKernel(
+void edgeMapDenseKernel(
     const VertexId *workqueue,
     const VertexId *workqueueSize,
     const EdgeId   *vertices,
@@ -54,9 +54,10 @@ void edgeMapKernel(
     int            *workset,
     F f)
 {
-    int tid = THREAD_INDEX;
-    if (tid >= *workqueueSize) return;
-    VertexId srcId = workqueue[tid];
+    VertexId pos = THREAD_INDEX;
+    if (pos >= *workqueueSize) return;
+    VertexId srcId = workqueue[pos];
+
     EdgeId start = vertices[srcId];
     EdgeId end = vertices[srcId + 1];
     EdgeId outdegree = end - start;
@@ -71,36 +72,46 @@ void edgeMapKernel(
     }
 }
 
-/**
- * The vertex map kernel.
- *
- * The initial value of `allVerticesInactive` is true. All the active vertices
- * write false to `allVerticesInactive`. When there is no vertex is active,
- * the final value will be false.
- */
 template<typename VertexValue,
          typename AccumValue,
          typename F>
 __global__
-void vertexMapKernel(
-    int         *workset,
-    int          verticeCount,
-    VertexValue *vertexValues,
+void edgeMapSparseKernel(
+    const int      *worksetSrc,
+    const VertexId worksetsize,
+    const EdgeId   *vertices,
+    const VertexId *outgoingEdges,
+    VertexValue    *vertexValues,
+    AccumValue     *accumulators,
+    int            *worksetDst,
     F f)
 {
-    int v = THREAD_INDEX;
-    if (v >= verticeCount) return;
-    if (workset[v] == 0) return;
-    f.update(vertexValues[v], v);  
+    VertexId srcId = THREAD_INDEX;
+    if (srcId >= worksetsize) return;
+    if (!worksetSrc[srcId]) return;
+
+    EdgeId start = vertices[srcId];
+    EdgeId end = vertices[srcId + 1];
+    EdgeId outdegree = end - start;
+    VertexValue srcValue = vertexValues[srcId];
+
+    for (EdgeId e = start; e < end; e ++) {
+        // Edge level parallelism, which is exploited by SIMD lanes
+        AccumValue accum = f.gather(srcValue, outdegree);
+        VertexId dstId = outgoingEdges[e];
+        f.reduce(accumulators[dstId], accum);
+        worksetDst[dstId] = 1;
+    }
 }
+
 
 template<typename VertexValue,
          typename AccumValue,
          typename F>
 __global__
-void vertexFilterKernel(
-    int         *workset,
-    int          verticeCount,
+void vertexFilterDenseKernel(
+    const int   *workset,
+    int          worksetsize,
     VertexValue *vertexValues,
     AccumValue  *accumulators,
     VertexId    *workqueue,
@@ -108,16 +119,56 @@ void vertexFilterKernel(
     F f)
 {
     int v = THREAD_INDEX;
-    if (v >= verticeCount) return;
-    if (workset[v] == 0) return;
+    if (v >= worksetsize) return;
+    if (!workset[v]) return;
 
     f.update(vertexValues[v], accumulators[v]);
-
-
     if (f.cond(vertexValues[v], v)) {
         VertexId pos = atomicAdd(workqueueSize, 1);
         workqueue[pos] = v;
     }
+}
+
+template<typename VertexValue,
+         typename AccumValue,
+         typename F>
+__global__
+void vertexFilterSparseKernel(
+    const int   *worksetSrc,
+    int          worksetsize,
+    VertexValue *vertexValues,
+    AccumValue  *accumulators,
+    int         *worksetDst,
+    F f)
+{
+    int v = THREAD_INDEX;
+    if (v >= worksetsize) return;
+    if (!worksetSrc[v]) return;
+
+    f.update(vertexValues[v], accumulators[v]);
+    if (f.cond(vertexValues[v], v)) {
+        worksetDst[v] = 1;
+    }
+}
+
+
+/**
+ * The vertex map kernel.
+ */
+template<typename VertexValue,
+         typename AccumValue,
+         typename F>
+__global__
+void vertexMapKernel(
+    const int   *workset,
+    int          worksetsize,
+    VertexValue *vertexValues,
+    F f)
+{
+    int v = THREAD_INDEX;
+    if (v >= worksetsize) return;
+    if (workset[v] == 0) return;
+    f.update(vertexValues[v], v);  
 }
 
 

@@ -106,6 +106,11 @@ public:
         }
     }
 
+
+    inline VertexId capacity() const {
+        return isDense ? workqueue.capacity() : workset.capacity(); 
+    }
+
     inline void clear() {
         if (isDense) {
             *qSize = 0;
@@ -127,7 +132,7 @@ public:
         } else {
             workset.persist();
             printf("sparse: ");
-            for (int i = 0; i < workset.size(); i++) {
+            for (int i = 0; i < workset.capacity(); i++) {
                 if (workset[i] == 1) {
                     printf("%d ", i);
                 }
