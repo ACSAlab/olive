@@ -58,25 +58,21 @@ struct PR_edge_F {
     inline void reduce(double &accumulator, double accum) {
         atomicAdd(&accumulator, accum);
     }
-};  // edgeMap
-
+};  // edgeMa
 
 struct PR_vertex_F {
-    double damping, fraction, addConstant;
+    double damping, addConstant;
 
-    PR_vertex_F(double _damping, double _oneOverN, double _fraction) : 
-        damping(_damping), fraction(_fraction),
+    PR_vertex_F(double _damping, double _oneOverN) : damping(_damping),
         addConstant( (1-_damping) * _oneOverN ) {}
 
     __device__
-    inline void update(PR_Vertex &v, double accum) {
+    inline void operator() (PR_Vertex &v, double accum) {
         double new_rank = damping * accum + addConstant;
         v.delta = new_rank - v.rank;
         v.rank = new_rank;
     }
-
-    __device__ bool cond(PR_Vertex v, VertexId id) { return true; }
-};  // vertexFilter
+};  // vertexMap
 
 struct PR_init_F {
     double rank;
@@ -84,13 +80,11 @@ struct PR_init_F {
     PR_init_F(double _rank): rank(_rank) {}
 
     __device__
-    inline void update(PR_Vertex &v, double accum) {
+    inline void operator() (PR_Vertex &v, double accum) {
         v.rank = rank;
         v.delta = rank;
     }
-
-    __device__ bool cond(PR_Vertex v, VertexId id) { return true; }
-};  // vertexFilter
+};  // vertexMap
 
 int main(int argc, char **argv) {
     
@@ -108,24 +102,16 @@ int main(int argc, char **argv) {
         graph.fromEdgeListFile(inFile);
     }
 
-    Oliver<PR_Vertex, int, double> ol;
+    Oliver<PR_Vertex, double, int> ol;
     ol.readGraph(graph);
-
-    // Write the result.
-    outputFile = fopen("PageRank.txt", "w");
 
     // Algorithm specific parameters
     const double damping = 0.85;
     const double oneOverN = 1.0 / ol.getVertexCount();
-    const double fraction = 0.01;
     const double epsilon = 0.0000001;
 
     // Frontiers
-    VertexSubset frontier(graph.vertexCount);            // Dense empty
-    VertexSubset edgeFrontier(graph.vertexCount, false); // Sparse empty
-    VertexSubset all(graph.vertexCount, true);           // Sparse universal
-
-    // Initialize the frontier to V
+    VertexSubset all(graph.vertexCount, true);  // Sparse universal
     ol.vertexMap<PR_init_F>(all, PR_init_F(oneOverN));
 
     double start = getTimeMillis();
@@ -134,9 +120,8 @@ int main(int argc, char **argv) {
 
     int iterations = 0;
     while (1) {
-        ol.edgeFilter<PR_edge_F>(edgeFrontier, all, PR_edge_F());
-        frontier.clear();
-        ol.vertexFilter<PR_vertex_F>(frontier, all, PR_vertex_F(damping, oneOverN, fraction));
+        ol.edgeMap<PR_edge_F>(all, PR_edge_F());
+        ol.vertexMap<PR_vertex_F>(all, PR_vertex_F(damping, oneOverN));
 
         double err = ol.vertexReduce();
         if (verbose) LOG(INFO) << "PR iterations: " << iterations
@@ -147,14 +132,14 @@ int main(int argc, char **argv) {
         iterations++;
     }
 
-    LOG(INFO) << "time=" << getTimeMillis() - start << "ms";
+    LOG(INFO) << "iterations: "<< iterations 
+              <<", time: " << getTimeMillis() - start << "ms";
 
     // Log the vertex value into a file
+    outputFile = fopen("PageRank.txt", "w");
     ol.printVertices();
 
     all.del();
-    frontier.del();
-    edgeFrontier.del();
 
     return 0;
 }

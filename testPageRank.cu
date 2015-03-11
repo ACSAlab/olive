@@ -103,8 +103,8 @@ int main(int argc, char **argv) {
         iterations++;
     }
 
-    LOG(INFO) << "iterations="<< iterations 
-              <<", time=" << getTimeMillis() - start << "ms";
+    LOG(INFO) << "iterations: "<< iterations 
+              <<", time: " << getTimeMillis() - start << "ms";
 
     FILE * outputFile;
     outputFile = fopen("PageRank.serial.txt", "w");

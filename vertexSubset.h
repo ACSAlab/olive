@@ -106,7 +106,6 @@ public:
         }
     }
 
-
     inline VertexId capacity() const {
         return isDense ? workqueue.capacity() : workset.capacity(); 
     }

@@ -64,25 +64,18 @@ struct BFS_vertex_F {
     inline void update(BFS_Vertex &v, int accum) { v.level = accum; }
 
     __device__
-    inline bool cond(BFS_Vertex v, VertexId id) {
+    inline bool cond(BFS_Vertex v, int accum) {
         return (v.level == infiniteCost);
     }
 };  // vertexFilter
 
 struct BFS_init_F {
-    int infiniteCost;
-    VertexId srcId;
+    int level;
 
-    BFS_init_F(int _cost, VertexId _id) : infiniteCost(_cost), srcId(_id) {}
+    BFS_init_F(int _level) : level(_level) {}
 
     __device__
-    inline void update(BFS_Vertex &v, VertexId id) {
-        if (id == srcId) {
-            v.level = 0;
-        } else {
-            v.level = infiniteCost;
-        }
-    }
+    inline void operator() (BFS_Vertex &v, int accum) { v.level = level; }
 };  // vertexMap
 
 
@@ -99,22 +92,25 @@ int main(int argc, char **argv) {
     Oliver<BFS_Vertex, int, int> ol;
     ol.readGraph(graph);
 
-    // Write the result.
-    outputFile = fopen("BFS.txt", "w");
-
     // Algorithm specific parameters
     const int infiniteCost = 0x7fffffff;
 
+
+
+    // Initializes the value of all vertices.
+    VertexSubset all(graph.vertexCount, true);
+    ol.vertexMap<BFS_init_F>(all, BFS_init_F(infiniteCost));
+    all.del();  // No longer used
+
     // Dense VertexSubset with a singleton vertex
+    // Initializes the value of source vertex to 0
     VertexSubset frontier(graph.vertexCount, source);
+    ol.vertexMap<BFS_init_F>(frontier, BFS_init_F(0));
+
 
     // Sparse VertexSubset to represent the expanding edges.
     VertexSubset edgeFrontier(graph.vertexCount, false); 
 
-    // Initializes the value of all vertices.
-    VertexSubset all(graph.vertexCount, true);
-    ol.vertexMap<BFS_init_F>(all, BFS_init_F(infiniteCost, source));
-    all.del();  // No longer used
 
     double start = getTimeMillis();    
     Stopwatch w;
@@ -128,14 +124,15 @@ int main(int argc, char **argv) {
         edgeFrontier.clear();
         if (frontier.size() == 0) break;
         if (verbose) LOG(INFO) << "BFS iterations " << iterations
-                               <<", size " << frontier.size()
-                               <<", time=" << w.getElapsedMillis() << "ms";
+                               <<", size: " << frontier.size()
+                               <<", time: " << w.getElapsedMillis() << "ms";
         iterations++;
     }
 
     LOG(INFO) << "time=" << getTimeMillis() - start << "ms";
 
     // Log the vertex value into a file
+    outputFile = fopen("BFS.txt", "w");
     ol.printVertices();
 
     frontier.del();

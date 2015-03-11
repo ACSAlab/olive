@@ -43,7 +43,9 @@
 #include "vertexSubset.h"
 #include "oliverKernel.h"
 
-template<typename VertexValue, typename EdgeValue, typename AccumValue>
+template<typename VertexValue,
+         typename AccumValue,
+         typename EdgeValue>
 class Oliver {
 public:
     /**
@@ -52,7 +54,7 @@ public:
      * produces a sparse vertex subset as output.
      */
     template<typename F>
-    void edgeFilter(VertexSubset dst, VertexSubset src, F f) {
+    void edgeFilter(VertexSubset &dst, const VertexSubset &src, F f) {
         assert(!dst.isDense);
         src.isDense ? edgeFilterDense(dst, src, f) :
                       edgeFilterSparse(dst, src, f);
@@ -62,12 +64,12 @@ public:
      * 
      */
     template<typename F>
-    inline void edgeFilterDense(VertexSubset dst, VertexSubset src, F f) {
+    inline void edgeFilterDense(VertexSubset &dst, const VertexSubset &src, F f) {
         // Clear the accumulator before the gather phase starts
         accumulators.allTo(0);
 
         auto c = util::kernelConfig(src.size());
-        edgeFilterDenseKernel<VertexValue, EdgeValue, AccumValue, F>
+        edgeFilterDenseKernel<VertexValue, AccumValue, EdgeValue, F>
         <<< c.first, c.second>>>(
             src.workqueue.elemsDevice,
             src.qSizeDevice,
@@ -85,12 +87,12 @@ public:
      * 
      */
     template<typename F>
-    inline void edgeFilterSparse(VertexSubset dst, VertexSubset src, F f) {
+    inline void edgeFilterSparse(VertexSubset &dst, const VertexSubset &src, F f) {
         // Clear the accumulator before the gather phase starts
         accumulators.allTo(0);
 
         auto c = util::kernelConfig(src.capacity());
-        edgeFilterSparseKernel<VertexValue, EdgeValue, AccumValue, F>
+        edgeFilterSparseKernel<VertexValue, AccumValue, EdgeValue, F>
         <<< c.first, c.second>>>(
             src.workset.elemsDevice,
             src.capacity(),
@@ -111,7 +113,7 @@ public:
      * vertex subset or a dense one as output.
      */
     template<typename F>
-    void vertexFilter(VertexSubset dst, VertexSubset src, F f) {
+    void vertexFilter(VertexSubset &dst, const VertexSubset &src, F f) {
         assert(!src.isDense);
         dst.isDense ? vertexFilterDense(dst, src, f) :
                       vertexFilterSparse(dst, src, f);
@@ -121,7 +123,7 @@ public:
      * 
      */
     template<typename F>
-    inline void vertexFilterDense(VertexSubset dst, VertexSubset src, F f) {
+    inline void vertexFilterDense(VertexSubset &dst, const VertexSubset &src, F f) {
         auto c = util::kernelConfig(src.capacity());
 
         vertexFilterDenseKernel<VertexValue, AccumValue, F>
@@ -140,10 +142,11 @@ public:
      * 
      */
     template<typename F>
-    inline void vertexFilterSparse(VertexSubset dst, VertexSubset src, F f) {
+    inline void vertexFilterSparse(VertexSubset &dst, const VertexSubset &src, F f) {
         auto c = util::kernelConfig(src.capacity());
 
-        vertexFilterSparseKernel<VertexValue, AccumValue, F> <<< c.first, c.second>>>(
+        vertexFilterSparseKernel<VertexValue, AccumValue, F>
+        <<< c.first, c.second>>>(
             src.workset.elemsDevice,
             src.capacity(),
             vertexValues.elemsDevice,
@@ -158,13 +161,35 @@ public:
      * @param f    The UDF applied to the vertices.
      */
     template<typename F>
-    void vertexMap(VertexSubset src, F f) {
+    void vertexMap(const VertexSubset &src, F f) {
+        src.isDense ? vertexMapDense(src, f) : 
+                      vertexMapSparse(src, f);
+    }
+
+    template<typename F>
+    void vertexMapSparse(const VertexSubset &src, F f) {
         assert(!src.isDense);
         auto c = util::kernelConfig(src.capacity());
-        vertexMapKernel<VertexValue, F> <<< c.first, c.second>>>(
+        vertexMapSparseKernel<VertexValue, AccumValue, F>
+        <<< c.first, c.second>>>(
             src.workset.elemsDevice,
             src.capacity(),
             vertexValues.elemsDevice,
+            accumulators.elemsDevice,
+            f);
+        CUDA_CHECK(cudaThreadSynchronize());
+    }
+
+    template<typename F>
+    void vertexMapDense(const VertexSubset &src, F f) {
+        assert(src.isDense);
+        auto c = util::kernelConfig(src.size());
+        vertexMapDenseKernel<VertexValue, AccumValue, F>
+        <<< c.first, c.second>>>(
+            src.workqueue.elemsDevice,
+            src.qSizeDevice,
+            vertexValues.elemsDevice,
+            accumulators.elemsDevice,
             f);
         CUDA_CHECK(cudaThreadSynchronize());
     }
@@ -175,14 +200,17 @@ public:
      * @param f    The UDF applied to the edge.
      */
     template<typename F>
-    void edgeMap(VertexSubset src, F f) {
+    void edgeMap(const VertexSubset &src, F f) {
         assert(!src.isDense);
         auto c = util::kernelConfig(src.capacity());
-        edgeMapKernel<EdgeValue, F> <<< c.first, c.second>>>(
+        edgeMapKernel<VertexValue, AccumValue, EdgeValue, F>
+        <<< c.first, c.second>>>(
             src.workset.elemsDevice,
             src.capacity(),
             srcVertices.elemsDevice,
             outgoingEdges.elemsDevice,
+            vertexValues.elemsDevice,
+            accumulators.elemsDevice,
             edgeValues.elemsDevice,
             f);
         CUDA_CHECK(cudaThreadSynchronize());
