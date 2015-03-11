@@ -45,7 +45,7 @@ struct BFS_Vertex {
 
 struct BFS_edge_F {
     __device__
-    inline int gather(BFS_Vertex src, EdgeId outdegree) {
+    inline int gather(BFS_Vertex src, EdgeId outdegree, int edgeValue) {
         return src.level + 1;        
     }
 
@@ -61,13 +61,11 @@ struct BFS_vertex_F {
     BFS_vertex_F(int _inf) : infiniteCost(_inf) {}
 
     __device__
-    inline bool cond(BFS_Vertex v, VertexId id) {
-        return (v.level == infiniteCost);
-    }
+    inline void update(BFS_Vertex &v, int accum) { v.level = accum; }
 
     __device__
-    inline void update(BFS_Vertex &v, int accum) {
-        v.level = accum;
+    inline bool cond(BFS_Vertex v, VertexId id) {
+        return (v.level == infiniteCost);
     }
 };  // vertexFilter
 
@@ -98,7 +96,7 @@ int main(int argc, char **argv) {
     // Read in the graph data.
     CsrGraph<int, int> graph;
     graph.fromEdgeListFile(inFile);
-    Oliver<BFS_Vertex, int> ol;
+    Oliver<BFS_Vertex, int, int> ol;
     ol.readGraph(graph);
 
     // Write the result.
@@ -107,12 +105,14 @@ int main(int argc, char **argv) {
     // Algorithm specific parameters
     const int infiniteCost = 0x7fffffff;
 
-    // Data structure
-    VertexSubset frontier(graph.vertexCount, source);    // Dense
-    VertexSubset edgeFrontier(graph.vertexCount, false); // Sparse
-    VertexSubset all(graph.vertexCount, true);
+    // Dense VertexSubset with a singleton vertex
+    VertexSubset frontier(graph.vertexCount, source);
+
+    // Sparse VertexSubset to represent the expanding edges.
+    VertexSubset edgeFrontier(graph.vertexCount, false); 
 
     // Initializes the value of all vertices.
+    VertexSubset all(graph.vertexCount, true);
     ol.vertexMap<BFS_init_F>(all, BFS_init_F(infiniteCost, source));
     all.del();  // No longer used
 
@@ -122,24 +122,20 @@ int main(int argc, char **argv) {
 
     int iterations = 0;
     while (1) {
-        
-        // frontier.print();
-        ol.edgeMap<BFS_edge_F>(edgeFrontier, frontier, BFS_edge_F());
+        ol.edgeFilter<BFS_edge_F>(edgeFrontier, frontier, BFS_edge_F());
         frontier.clear();
-
-        // edgeFrontier.print();
         ol.vertexFilter<BFS_vertex_F>(frontier, edgeFrontier, BFS_vertex_F(infiniteCost));
         edgeFrontier.clear();
-
         if (frontier.size() == 0) break;
-        iterations++;
         if (verbose) LOG(INFO) << "BFS iterations " << iterations
                                <<", size " << frontier.size()
                                <<", time=" << w.getElapsedMillis() << "ms";
+        iterations++;
     }
 
     LOG(INFO) << "time=" << getTimeMillis() - start << "ms";
 
+    // Log the vertex value into a file
     ol.printVertices();
 
     frontier.del();

@@ -95,7 +95,6 @@ int main(int argc, char **argv) {
             err += fabs(deltas[i]);
         }
 
-
         if (verbose) LOG(INFO) << "PR iterations: " << iterations
                                << ", err: " << err
                                <<", time: " << w.getElapsedMillis() << "ms";

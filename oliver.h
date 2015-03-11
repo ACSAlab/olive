@@ -43,68 +43,89 @@
 #include "vertexSubset.h"
 #include "oliverKernel.h"
 
-template<typename VertexValue, typename AccumValue>
+template<typename VertexValue, typename EdgeValue, typename AccumValue>
 class Oliver {
 public:
     /**
-     * The edgeMap function.
+     * The edgeFilter function invokes the corresponding subroutine
+     * according to the representation of the source vertex subset and
+     * produces a sparse vertex subset as output.
      */
     template<typename F>
-    void edgeMap(VertexSubset dst, VertexSubset src, F f) {
+    void edgeFilter(VertexSubset dst, VertexSubset src, F f) {
         assert(!dst.isDense);
-        src.isDense ? edgeMapDense(dst, src, f) : edgeMapSparse(dst, src, f); 
+        src.isDense ? edgeFilterDense(dst, src, f) :
+                      edgeFilterSparse(dst, src, f);
     }
 
-    template<typename F> 
-    inline void edgeMapDense(VertexSubset dst, VertexSubset src, F f) {
+    /**
+     * 
+     */
+    template<typename F>
+    inline void edgeFilterDense(VertexSubset dst, VertexSubset src, F f) {
         // Clear the accumulator before the gather phase starts
         accumulators.allTo(0);
 
         auto c = util::kernelConfig(src.size());
-        edgeMapDenseKernel<VertexValue, AccumValue, F> <<< c.first, c.second>>>(
+        edgeFilterDenseKernel<VertexValue, EdgeValue, AccumValue, F>
+        <<< c.first, c.second>>>(
             src.workqueue.elemsDevice,
             src.qSizeDevice,
             srcVertices.elemsDevice,
             outgoingEdges.elemsDevice,
             vertexValues.elemsDevice,
             accumulators.elemsDevice,
-            dst.workset.elemsDevice,
-            f);
-        CUDA_CHECK(cudaThreadSynchronize());
-    }
-
-    template<typename F> 
-    inline void edgeMapSparse(VertexSubset dst, VertexSubset src, F f) {
-        // Clear the accumulator before the gather phase starts
-        accumulators.allTo(0);
-
-        auto c = util::kernelConfig(src.capacity());
-        edgeMapSparseKernel<VertexValue, AccumValue, F> <<< c.first, c.second>>>(
-            src.workset.elemsDevice,
-            src.capacity(),
-            srcVertices.elemsDevice,
-            outgoingEdges.elemsDevice,
-            vertexValues.elemsDevice,
-            accumulators.elemsDevice,
+            edgeValues.elemsDevice,
             dst.workset.elemsDevice,
             f);
         CUDA_CHECK(cudaThreadSynchronize());
     }
 
     /**
-     * vertexFilter is used to update the local vertex state. 
-     * Meanwhile it filters out a subset of vertices.
+     * 
+     */
+    template<typename F>
+    inline void edgeFilterSparse(VertexSubset dst, VertexSubset src, F f) {
+        // Clear the accumulator before the gather phase starts
+        accumulators.allTo(0);
+
+        auto c = util::kernelConfig(src.capacity());
+        edgeFilterSparseKernel<VertexValue, EdgeValue, AccumValue, F>
+        <<< c.first, c.second>>>(
+            src.workset.elemsDevice,
+            src.capacity(),
+            srcVertices.elemsDevice,
+            outgoingEdges.elemsDevice,
+            vertexValues.elemsDevice,
+            accumulators.elemsDevice,
+            edgeValues.elemsDevice,
+            dst.workset.elemsDevice,
+            f);
+        CUDA_CHECK(cudaThreadSynchronize());
+    }
+
+    /**
+     * vertexFilter is used to update the local vertex state.
+     *
+     * It takes as input a sparse vertex subset and produces either a sparse
+     * vertex subset or a dense one as output.
      */
     template<typename F>
     void vertexFilter(VertexSubset dst, VertexSubset src, F f) {
         assert(!src.isDense);
-        dst.isDense ? vertexFilterDense(dst, src, f) : vertexFilterSparse(dst, src, f);
+        dst.isDense ? vertexFilterDense(dst, src, f) :
+                      vertexFilterSparse(dst, src, f);
     }
 
+    /**
+     * 
+     */
     template<typename F>
     inline void vertexFilterDense(VertexSubset dst, VertexSubset src, F f) {
         auto c = util::kernelConfig(src.capacity());
-        vertexFilterDenseKernel<VertexValue, AccumValue, F> <<< c.first, c.second>>>(
+
+        vertexFilterDenseKernel<VertexValue, AccumValue, F>
+        <<< c.first, c.second>>>(
             src.workset.elemsDevice,
             src.capacity(),
             vertexValues.elemsDevice,
@@ -115,9 +136,13 @@ public:
         CUDA_CHECK(cudaThreadSynchronize());
     }
 
+    /**
+     * 
+     */
     template<typename F>
     inline void vertexFilterSparse(VertexSubset dst, VertexSubset src, F f) {
         auto c = util::kernelConfig(src.capacity());
+
         vertexFilterSparseKernel<VertexValue, AccumValue, F> <<< c.first, c.second>>>(
             src.workset.elemsDevice,
             src.capacity(),
@@ -125,7 +150,6 @@ public:
             accumulators.elemsDevice,
             dst.workset.elemsDevice,
             f);
-        CUDA_CHECK(cudaThreadSynchronize());
     }
 
     /**
@@ -134,12 +158,32 @@ public:
      * @param f    The UDF applied to the vertices.
      */
     template<typename F>
-    void vertexMap(VertexSubset srcV, F f) {
-        auto c = util::kernelConfig(vertexCount);
-        vertexMapKernel<VertexValue, AccumValue, F> <<< c.first, c.second>>>(
-            srcV.workset.elemsDevice,
-            vertexCount,
+    void vertexMap(VertexSubset src, F f) {
+        assert(!src.isDense);
+        auto c = util::kernelConfig(src.capacity());
+        vertexMapKernel<VertexValue, F> <<< c.first, c.second>>>(
+            src.workset.elemsDevice,
+            src.capacity(),
             vertexValues.elemsDevice,
+            f);
+        CUDA_CHECK(cudaThreadSynchronize());
+    }
+
+    /**
+     * edgeMap is used to update the local edge state.
+     * @param src  A subset of vertices the UDF will be applied to.
+     * @param f    The UDF applied to the edge.
+     */
+    template<typename F>
+    void edgeMap(VertexSubset src, F f) {
+        assert(!src.isDense);
+        auto c = util::kernelConfig(src.capacity());
+        edgeMapKernel<EdgeValue, F> <<< c.first, c.second>>>(
+            src.workset.elemsDevice,
+            src.capacity(),
+            srcVertices.elemsDevice,
+            outgoingEdges.elemsDevice,
+            edgeValues.elemsDevice,
             f);
         CUDA_CHECK(cudaThreadSynchronize());
     }
@@ -155,7 +199,7 @@ public:
             vertexValues[i].reduce(r);
         }
         return r;
-    } 
+    }
 
     void readGraph(const CsrGraph<int, int> &graph) {
         vertexCount = graph.vertexCount;
@@ -164,6 +208,7 @@ public:
         outgoingEdges.reserve(edgeCount);
         vertexValues.reserve(vertexCount);
         accumulators.reserve(vertexCount);
+        edgeValues.reserve(edgeCount);
         memcpy(srcVertices.elemsHost, graph.vertices, sizeof(EdgeId) * (vertexCount + 1));
         memcpy(outgoingEdges.elemsHost, graph.edges, sizeof(VertexId) * edgeCount);
         srcVertices.cache();
@@ -185,6 +230,7 @@ public:
         outgoingEdges.del();
         vertexValues.del();
         accumulators.del();
+        edgeValues.del();
     }
 
 private:
@@ -206,6 +252,7 @@ private:
      */
     GRD<VertexValue> vertexValues;
     GRD<AccumValue>  accumulators;
+    GRD<EdgeValue>   edgeValues;
 
 
 };

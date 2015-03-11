@@ -50,7 +50,7 @@ struct PR_Vertex {
 
 struct PR_edge_F {
     __device__
-    inline double gather(PR_Vertex srcValue, EdgeId outdegree) {
+    inline double gather(PR_Vertex srcValue, EdgeId outdegree, int edgeValue) {
         return srcValue.rank / outdegree;
     }
 
@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
         graph.fromEdgeListFile(inFile);
     }
 
-    Oliver<PR_Vertex, double> ol;
+    Oliver<PR_Vertex, int, double> ol;
     ol.readGraph(graph);
 
     // Write the result.
@@ -126,37 +126,30 @@ int main(int argc, char **argv) {
     VertexSubset all(graph.vertexCount, true);           // Sparse universal
 
     // Initialize the frontier to V
-    ol.vertexFilter<PR_init_F>(frontier, all, PR_init_F(oneOverN));
+    ol.vertexMap<PR_init_F>(all, PR_init_F(oneOverN));
 
     double start = getTimeMillis();
     Stopwatch w;
     w.start();
 
     int iterations = 0;
-    while (iterations < maxIterations) {
-
-        // frontier.print();
-        ol.edgeMap<PR_edge_F>(edgeFrontier, all, PR_edge_F());
-
+    while (1) {
+        ol.edgeFilter<PR_edge_F>(edgeFrontier, all, PR_edge_F());
         frontier.clear();
-
         ol.vertexFilter<PR_vertex_F>(frontier, all, PR_vertex_F(damping, oneOverN, fraction));
-
 
         double err = ol.vertexReduce();
         if (verbose) LOG(INFO) << "PR iterations: " << iterations
-                               << ", size: " << frontier.size()
                                << ", err: " << err
                                <<", time: " << w.getElapsedMillis() << "ms";
-        
-
+        if (iterations >= maxIterations) break;
         if (err < epsilon) break;
         iterations++;
     }
 
     LOG(INFO) << "time=" << getTimeMillis() - start << "ms";
 
-
+    // Log the vertex value into a file
     ol.printVertices();
 
     all.del();
