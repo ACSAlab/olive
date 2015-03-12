@@ -50,7 +50,7 @@ struct PR_Vertex {
 
 struct PR_edge_F {
     __device__
-    inline double gather(PR_Vertex srcValue, EdgeId outdegree, int edgeValue) {
+    inline double gather(PR_Vertex srcValue, EdgeId outdegree, Dump_Edge edge) {
         return srcValue.rank / outdegree;
     }
 
@@ -87,11 +87,12 @@ struct PR_init_F {
 };  // vertexMap
 
 int main(int argc, char **argv) {
-    
-    CommandLine cl(argc, argv, "<inFile> [-dimacs] [-verbose]");
+    CommandLine cl(argc, argv, "<inFile> [-dimacs] [-verbose] [-round 100]");
     char * inFile = cl.getArgument(0);
     bool dimacs = cl.getOption("-dimacs");
     bool verbose = cl.getOption("-verbose");
+    int max_rounds = cl.getOptionIntValue("-round", 100);
+
 
     // Read the graph file.
     CsrGraph<int, int> graph;
@@ -101,13 +102,13 @@ int main(int argc, char **argv) {
         graph.fromEdgeListFile(inFile);
     }
 
-    Oliver<PR_Vertex, double, int> ol;
-    ol.readGraph(graph);
-
     // Algorithm specific parameters
     const double damping = 0.85;
-    const double oneOverN = 1.0 / ol.getVertexCount();
+    const double oneOverN = 1.0 / graph.vertexCount;
     const double epsilon = 0.0000001;
+
+    Oliver<PR_Vertex, Dump_Edge, double> ol;
+    ol.readGraph(graph);
 
     // Universal vertex set in sparse representation
     VertexSubset all(graph.vertexCount, true);  
@@ -119,21 +120,20 @@ int main(int argc, char **argv) {
 
     int iterations = 0;
     while (1) {
-        iterations++;
-
         ol.edgeMap<PR_edge_F>(all, PR_edge_F());
         ol.vertexMap<PR_vertex_F>(all, PR_vertex_F(damping, oneOverN));
 
         double err = ol.vertexReduce();
+        if (err < epsilon || iterations == max_rounds) break;
+        if (verbose)
+            LOG(INFO) << "PR iterations: " << iterations << ", err: " << err
+                      <<", time: " << w.getElapsedMillis() << "ms";
 
-        if (verbose) LOG(INFO) << "PR iterations: " << iterations
-                               << ", err: " << err
-                               <<", time: " << w.getElapsedMillis() << "ms";
-        if (err < epsilon) break;
+        iterations++;
     }
 
-    LOG(INFO) << "iterations: "<< iterations 
-              <<", time: " << getTimeMillis() - start << "ms";
+    double totalTime =  getTimeMillis() - start;
+    LOG(INFO) << "iterations: " << iterations <<", time: " << totalTime << "ms";
 
     // Log the vertex value into a file
     outputFile = fopen("PageRank.txt", "w");

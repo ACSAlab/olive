@@ -62,6 +62,11 @@ typedef uint32_t EdgeId;
 /** Defines the type for the partition identifier. */
 typedef uint32_t PartitionId;
 
+
+struct Dump_Edge {
+}; // Dump Edge
+
+
 /**
  * Constants for kernel configuration.
  */

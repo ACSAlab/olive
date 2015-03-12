@@ -132,6 +132,13 @@ public:
         }
     }
 
+    inline void peek() {
+        persist();
+        for (int i = 0; i < length; i++) {
+            std::cout << elemsHost[i] << " ";
+        }
+        printf("\n");
+    }
 
     /**
      * Caches the dataset in GPU's on-board memory.

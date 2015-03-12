@@ -44,8 +44,8 @@
 #include "oliverKernel.h"
 
 template<typename VertexValue,
-         typename AccumValue,
-         typename EdgeValue>
+         typename EdgeValue,
+         typename AccumValue>
 class Oliver {
 public:
     /**
@@ -58,8 +58,11 @@ public:
 
         assert(!dst.isDense);
 
-        // Clear the accumulator before the gather phase starts
-        accumulators.clear();
+        // Clear the destination subset before generating it.
+        dst.clear();
+
+        // Reset the accumulators before the gather phase starts
+        accumulators.allTo(defaultAccumValue);
 
         if (src.isDense) {
             auto c = util::kernelConfig(src.size());
@@ -99,10 +102,11 @@ public:
     template<typename F>
     void edgeMap(const VertexSubset &src, F f) {
 
-      // Clear the accumulator before the gather phase starts
-        accumulators.clear();
-
         assert(!src.isDense);
+
+        // Reset the accumulators before the gather phase starts
+        accumulators.allTo(defaultAccumValue);
+        
         auto c = util::kernelConfig(src.capacity());
         edgeMapKernel<VertexValue, AccumValue, EdgeValue, F>
         <<< c.first, c.second>>>(
@@ -117,7 +121,6 @@ public:
         CUDA_CHECK(cudaThreadSynchronize());
     }
 
-
     /**
      * vertexFilter is used to update the local vertex state.
      *
@@ -126,7 +129,11 @@ public:
      */
     template<typename F>
     void vertexFilter(VertexSubset &dst, const VertexSubset &src, F f) {
+        
         assert(!src.isDense);
+
+        // Clear the destination subset before generating it.
+        dst.clear();
 
         if (dst.isDense) {
             auto c = util::kernelConfig(src.capacity());
@@ -197,6 +204,11 @@ public:
         return r;
     }
 
+    /** Initialize with a default accumulator value  */
+    Oliver(AccumValue _accum) : defaultAccumValue(_accum) {}
+
+    Oliver() : defaultAccumValue(0) {}
+
     void readGraph(const CsrGraph<int, int> &graph) {
         vertexCount = graph.vertexCount;
         edgeCount = graph.edgeCount;
@@ -214,6 +226,11 @@ public:
     inline void printVertices() {
         vertexValues.persist();
         vertexValues.print();
+    }
+
+    inline void printEdges() {
+        edgeValues.persist();
+        edgeValues.print();
     }
 
     /** Returns the number of the vertices in the graph. */
@@ -249,7 +266,7 @@ private:
     GRD<VertexValue> vertexValues;
     GRD<AccumValue>  accumulators;
     GRD<EdgeValue>   edgeValues;
-
+    AccumValue       defaultAccumValue;
 
 };
 
