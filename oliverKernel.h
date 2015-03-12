@@ -37,40 +37,6 @@
 #include "common.h"
 
 
-/**
- * The vertex map kernel.
- */
-template<typename VertexValue,
-         typename AccumValue,
-         typename EdgeValue,
-         typename F>
-__global__
-void edgeMapKernel(
-    const int      *workset,
-    int             worksetsize,
-    const EdgeId   *vertices,
-    const VertexId *outgoingEdges,
-    VertexValue    *vertexValues,
-    AccumValue     *accumulators,
-    EdgeValue      *edgeValues,
-    F f)
-{
-    VertexId srcId = THREAD_INDEX;
-    if (srcId >= worksetsize) return;
-    if (!workset[srcId]) return;
-
-    EdgeId start = vertices[srcId];
-    EdgeId end = vertices[srcId + 1];
-    EdgeId outdegree = end - start;
-    VertexValue srcValue = vertexValues[srcId];
-
-    for (EdgeId e = start; e < end; e ++) {
-        // Edge level parallelism, which is exploited by SIMD lanes
-        AccumValue accum = f.gather(srcValue, outdegree, edgeValues[e]);
-        VertexId dstId = outgoingEdges[e];
-        f.reduce(accumulators[dstId], accum);
-    }
-}
 
 
 /**
@@ -117,7 +83,7 @@ template<typename VertexValue,
 __global__
 void edgeFilterSparseKernel(
     const int      *worksetSrc,
-    const VertexId worksetsize,
+    VertexId       worksetsize,
     const EdgeId   *vertices,
     const VertexId *outgoingEdges,
     VertexValue    *vertexValues,
@@ -145,13 +111,50 @@ void edgeFilterSparseKernel(
 }
 
 
+/**
+ * The vertex map kernel.
+ */
+template<typename VertexValue,
+         typename AccumValue,
+         typename EdgeValue,
+         typename F>
+__global__
+void edgeMapKernel(
+    const int      *workset,
+    VertexId       worksetsize,
+    const EdgeId   *vertices,
+    const VertexId *outgoingEdges,
+    VertexValue    *vertexValues,
+    AccumValue     *accumulators,
+    EdgeValue      *edgeValues,
+    F f)
+{
+    VertexId srcId = THREAD_INDEX;
+    if (srcId >= worksetsize) return;
+    if (!workset[srcId]) return;
+
+    EdgeId start = vertices[srcId];
+    EdgeId end = vertices[srcId + 1];
+    EdgeId outdegree = end - start;
+    VertexValue srcValue = vertexValues[srcId];
+
+    for (EdgeId e = start; e < end; e ++) {
+        // Edge level parallelism, which is exploited by SIMD lanes
+        AccumValue accum = f.gather(srcValue, outdegree, edgeValues[e]);
+        VertexId dstId = outgoingEdges[e];
+        f.reduce(accumulators[dstId], accum);
+    }
+}
+
+
+
 template<typename VertexValue,
          typename AccumValue,
          typename F>
 __global__
 void vertexFilterDenseKernel(
     const int   *workset,
-    int          worksetsize,
+    VertexId     worksetsize,
     VertexValue *vertexValues,
     AccumValue  *accumulators,
     VertexId    *workqueue,
@@ -175,7 +178,7 @@ template<typename VertexValue,
 __global__
 void vertexFilterSparseKernel(
     const int   *worksetSrc,
-    int          worksetsize,
+    VertexId     worksetsize,
     VertexValue *vertexValues,
     AccumValue  *accumulators,
     int         *worksetDst,
@@ -201,14 +204,15 @@ template<typename VertexValue,
 __global__
 void vertexMapSparseKernel(
     const int    *workset,
-    int           worksetsize,
+    VertexId      worksetsize,
     VertexValue  *vertexValues,
     AccumValue   *accumulators,
     F f)
 {
     int v = THREAD_INDEX;
     if (v >= worksetsize) return;
-    if (workset[v] == 0) return;
+    if (!workset[v]) return;
+
     f(vertexValues[v], accumulators[v]);
 }
 

@@ -88,7 +88,19 @@ public:
      * Set all the elements to the value `x` on the device.
      */
     void allTo(T x) {
-        CUDA_CHECK(cudaMemset(elemsDevice, x, sizeof(T) * length));
+        for (size_t i = 0; i < length; i++) {
+            elemsHost[i] = x;
+        }
+        CUDA_CHECK(cudaSetDevice(deviceId));
+        CUDA_CHECK(cudaMemcpy(elemsDevice, elemsHost,
+                              length * sizeof(T), cudaMemcpyDefault));
+    }
+
+    /**
+     * Clear the every bytesto of the GRD.
+     */
+    void clear() {
+        CUDA_CHECK(cudaMemset(elemsDevice, 0, sizeof(T) * length));
     }
 
     /**

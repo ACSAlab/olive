@@ -81,36 +81,38 @@ struct BFS_init_F {
 
 int main(int argc, char **argv) {
 
-    CommandLine cl(argc, argv, "<inFile> -s 0");
+    CommandLine cl(argc, argv, "<inFile> [-s 0] [-dimacs] [-verbose]");
     char * inFile = cl.getArgument(0);
     VertexId source = cl.getOptionIntValue("-s", 0);
+    bool dimacs = cl.getOption("-dimacs");
     bool verbose = cl.getOption("-verbose");
 
-    // Read in the graph data.
+    // Read the graph file.
     CsrGraph<int, int> graph;
-    graph.fromEdgeListFile(inFile);
+    if (dimacs) {
+        graph.fromDimacsFile(inFile);
+    } else {
+        graph.fromEdgeListFile(inFile);
+    }
+
     Oliver<BFS_Vertex, int, int> ol;
     ol.readGraph(graph);
 
     // Algorithm specific parameters
     const int infiniteCost = 0x7fffffff;
 
-
-
     // Initializes the value of all vertices.
     VertexSubset all(graph.vertexCount, true);
     ol.vertexMap<BFS_init_F>(all, BFS_init_F(infiniteCost));
     all.del();  // No longer used
 
-    // Dense VertexSubset with a singleton vertex
-    // Initializes the value of source vertex to 0
+    // Make a dense VertexSubset with a singleton vertex (source)
+    // and initializes the level of it to 0
     VertexSubset frontier(graph.vertexCount, source);
     ol.vertexMap<BFS_init_F>(frontier, BFS_init_F(0));
 
-
     // Sparse VertexSubset to represent the expanding edges.
     VertexSubset edgeFrontier(graph.vertexCount, false); 
-
 
     double start = getTimeMillis();    
     Stopwatch w;
@@ -118,6 +120,8 @@ int main(int argc, char **argv) {
 
     int iterations = 0;
     while (1) {
+        iterations++;
+
         ol.edgeFilter<BFS_edge_F>(edgeFrontier, frontier, BFS_edge_F());
         frontier.clear();
         ol.vertexFilter<BFS_vertex_F>(frontier, edgeFrontier, BFS_vertex_F(infiniteCost));
@@ -126,7 +130,6 @@ int main(int argc, char **argv) {
         if (verbose) LOG(INFO) << "BFS iterations " << iterations
                                <<", size: " << frontier.size()
                                <<", time: " << w.getElapsedMillis() << "ms";
-        iterations++;
     }
 
     LOG(INFO) << "time=" << getTimeMillis() - start << "ms";

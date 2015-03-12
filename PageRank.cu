@@ -88,9 +88,8 @@ struct PR_init_F {
 
 int main(int argc, char **argv) {
     
-    CommandLine cl(argc, argv, "<inFile> [-max 100]");
+    CommandLine cl(argc, argv, "<inFile> [-dimacs] [-verbose]");
     char * inFile = cl.getArgument(0);
-    int maxIterations = cl.getOptionIntValue("-max", 100);
     bool dimacs = cl.getOption("-dimacs");
     bool verbose = cl.getOption("-verbose");
 
@@ -110,8 +109,8 @@ int main(int argc, char **argv) {
     const double oneOverN = 1.0 / ol.getVertexCount();
     const double epsilon = 0.0000001;
 
-    // Frontiers
-    VertexSubset all(graph.vertexCount, true);  // Sparse universal
+    // Universal vertex set in sparse representation
+    VertexSubset all(graph.vertexCount, true);  
     ol.vertexMap<PR_init_F>(all, PR_init_F(oneOverN));
 
     double start = getTimeMillis();
@@ -120,16 +119,17 @@ int main(int argc, char **argv) {
 
     int iterations = 0;
     while (1) {
+        iterations++;
+
         ol.edgeMap<PR_edge_F>(all, PR_edge_F());
         ol.vertexMap<PR_vertex_F>(all, PR_vertex_F(damping, oneOverN));
 
         double err = ol.vertexReduce();
+
         if (verbose) LOG(INFO) << "PR iterations: " << iterations
                                << ", err: " << err
                                <<", time: " << w.getElapsedMillis() << "ms";
-        if (iterations >= maxIterations) break;
         if (err < epsilon) break;
-        iterations++;
     }
 
     LOG(INFO) << "iterations: "<< iterations 

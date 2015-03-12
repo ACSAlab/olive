@@ -115,7 +115,7 @@ public:
             *qSize = 0;
             CUDA_CHECK(H2D(qSizeDevice, qSize, sizeof(VertexId)));
         } else {
-            workset.allTo(0);
+            workset.clear();
         }
     }
 
