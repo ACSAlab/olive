@@ -86,6 +86,8 @@ int main(int argc, char **argv) {
     int max_rounds = cl.getOptionIntValue("-round", 100);
     bool dimacs = cl.getOption("-dimacs");
     bool verbose = cl.getOption("-verbose");
+    int group_size = cl.getOptionIntValue("-g", 1);
+    bool use_scan = cl.getOption("-scan");
 
     // Read the graph file.
     CsrGraph<int, int> graph;
@@ -121,13 +123,27 @@ int main(int argc, char **argv) {
     int iterations = 0;
     while (1) {
         int size = frontier.size();
-        ol.edgeFilter<BFS_edge_F>(edgeFrontier, frontier, BFS_edge_F());
-        ol.vertexFilter<BFS_vertex_F>(frontier, edgeFrontier, BFS_vertex_F(infCost));
+        
+        switch(group_size) {
+            case 1:  ol.edgeFilter<BFS_edge_F, 1>(edgeFrontier, frontier, BFS_edge_F()); break;
+            case 2:  ol.edgeFilter<BFS_edge_F, 2>(edgeFrontier, frontier, BFS_edge_F()); break;
+            case 4:  ol.edgeFilter<BFS_edge_F, 4>(edgeFrontier, frontier, BFS_edge_F()); break;
+            case 8:  ol.edgeFilter<BFS_edge_F, 8>(edgeFrontier, frontier, BFS_edge_F()); break;
+            case 16: ol.edgeFilter<BFS_edge_F, 16>(edgeFrontier, frontier, BFS_edge_F()); break;
+            case 32: ol.edgeFilter<BFS_edge_F, 32>(edgeFrontier, frontier, BFS_edge_F()); break;
+            default: assert(0);
+        }
 
+        if (use_scan) 
+            ol.vertexFilter<BFS_vertex_F, true>(frontier, edgeFrontier, BFS_vertex_F(infCost));
+        else
+            ol.vertexFilter<BFS_vertex_F, false>(frontier, edgeFrontier, BFS_vertex_F(infCost));
+  
         if (size == 0 || iterations == max_rounds) break;
-        if (verbose)
+        if (verbose) {
             LOG(INFO) << "BFS iterations " << iterations <<", size: "<< size
                       <<", time: " << w.getElapsedMillis() << "ms";
+        }
         iterations++;
     }
 

@@ -72,20 +72,19 @@ struct Dump_Edge {
  */
 const int DEFAULT_THREADS_PER_BLOCK = 256;
 
-/**
- * Machine-specified limits.
- */
-const int MAX_BLOCKS = 65535;
 
 /**
  * Machine-specified limits. 1024 for sm3.5, 512 for sm2.0
  */
+
 const int MAX_THREADS_PER_BLOCK = 1024;
 
 /**
  * Machine-specified limits.
  */
-const int MAX_THREADS = MAX_THREADS_PER_BLOCK * MAX_BLOCKS;
+const int MAX_BLOCKS = 65535;
+
+
 
 
 /**
@@ -94,6 +93,9 @@ const int MAX_THREADS = MAX_THREADS_PER_BLOCK * MAX_BLOCKS;
 #define BLOCK_INDEX blockIdx.x
 
 #define THREAD_INDEX (threadIdx.x + blockDim.x * blockIdx.x)
+
+#define NUM_BLOCKS gridDim.x
+#define NUM_THREADS (blockDim.x * gridDim.x)
 
 /**
  * A wrapper that asserts the success of CUDA calls

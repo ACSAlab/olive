@@ -53,20 +53,21 @@ public:
      * according to the representation of the source vertex subset and
      * produces a sparse vertex subset as output.
      */
-    template<typename F>
+    template<typename F, int GroupSize>
     void edgeFilter(VertexSubset &dst, const VertexSubset &src, F f) {
 
         assert(!dst.isDense);
+        assert(src.isDense);
 
         // Clear the destination subset before generating it.
         dst.clear();
 
         // Reset the accumulators before the gather phase starts
         accumulators.allTo(defaultAccumValue);
+        {
+            auto c = util::kernelConfig(src.size() * GroupSize);
 
-        if (src.isDense) {
-            auto c = util::kernelConfig(src.size());
-            edgeFilterDenseKernel<VertexValue, AccumValue, EdgeValue, F>
+            edgeFilterKernel<VertexValue, AccumValue, EdgeValue, F, GroupSize>
             <<< c.first, c.second>>>(
                 src.workqueue.elemsDevice,
                 src.qSizeDevice,
@@ -77,22 +78,40 @@ public:
                 edgeValues.elemsDevice,
                 dst.workset.elemsDevice,
                 f);
-        } else {
-            auto c = util::kernelConfig(src.capacity());
-            edgeFilterSparseKernel<VertexValue, AccumValue, EdgeValue, F>
-            <<< c.first, c.second>>>(
-                src.workset.elemsDevice,
-                src.capacity(),
-                srcVertices.elemsDevice,
-                outgoingEdges.elemsDevice,
-                vertexValues.elemsDevice,
-                accumulators.elemsDevice,
-                edgeValues.elemsDevice,
-                dst.workset.elemsDevice,
-                f);
         }
         CUDA_CHECK(cudaThreadSynchronize());
     }
+
+
+    /**
+     * vertexFilter is used to update the local vertex state.
+     *
+     * It takes as input a sparse vertex subset and produces either a sparse
+     * vertex subset or a dense one as output.
+     */
+    template<typename F, bool UseScan>
+    void vertexFilter(VertexSubset &dst, const VertexSubset &src, F f) {
+        
+        assert(!src.isDense);
+        assert(dst.isDense);
+        // Clear the destination subset before generating it.
+        dst.clear();
+
+        {
+            auto c = util::kernelConfig(src.capacity());
+            vertexFilterKernel<VertexValue, AccumValue, F, UseScan>
+            <<< c.first, c.second>>>(
+                src.workset.elemsDevice,
+                src.capacity(),
+                vertexValues.elemsDevice,
+                accumulators.elemsDevice,
+                dst.workqueue.elemsDevice,
+                dst.qSizeDevice,
+                f);
+        } 
+        CUDA_CHECK(cudaThreadSynchronize());
+    }
+
 
     /**
      * edgeMap is used to update the local edge state.
@@ -118,45 +137,6 @@ public:
             accumulators.elemsDevice,
             edgeValues.elemsDevice,
             f);
-        CUDA_CHECK(cudaThreadSynchronize());
-    }
-
-    /**
-     * vertexFilter is used to update the local vertex state.
-     *
-     * It takes as input a sparse vertex subset and produces either a sparse
-     * vertex subset or a dense one as output.
-     */
-    template<typename F>
-    void vertexFilter(VertexSubset &dst, const VertexSubset &src, F f) {
-        
-        assert(!src.isDense);
-
-        // Clear the destination subset before generating it.
-        dst.clear();
-
-        if (dst.isDense) {
-            auto c = util::kernelConfig(src.capacity());
-            vertexFilterDenseKernel<VertexValue, AccumValue, F>
-            <<< c.first, c.second>>>(
-                src.workset.elemsDevice,
-                src.capacity(),
-                vertexValues.elemsDevice,
-                accumulators.elemsDevice,
-                dst.workqueue.elemsDevice,
-                dst.qSizeDevice,
-                f);
-        } else {
-            auto c = util::kernelConfig(src.capacity());
-            vertexFilterSparseKernel<VertexValue, AccumValue, F>
-            <<< c.first, c.second>>>(
-                src.workset.elemsDevice,
-                src.capacity(),
-                vertexValues.elemsDevice,
-                accumulators.elemsDevice,
-                dst.workset.elemsDevice,
-                f);
-        }
         CUDA_CHECK(cudaThreadSynchronize());
     }
 
@@ -188,8 +168,6 @@ public:
         }
         CUDA_CHECK(cudaThreadSynchronize());
     }
-
-
 
     /**
      * Reduce the vertex value by specifying a reduce function

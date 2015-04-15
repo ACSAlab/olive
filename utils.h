@@ -57,8 +57,10 @@ std::pair<int, int> kernelConfig(int threads,
                                  int threadsPerBlock = DEFAULT_THREADS_PER_BLOCK) {
     if (threads == 0) {
         return std::make_pair(0, 0);
-    } 
-    assert(threads <= MAX_THREADS);
+    }
+
+    assert(threadsPerBlock <= MAX_THREADS_PER_BLOCK);
+
     if (threads < threadsPerBlock) threadsPerBlock = threads;
     int blocks =  threads % threadsPerBlock == 0 ?
                   threads / threadsPerBlock :
